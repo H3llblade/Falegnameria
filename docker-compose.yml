@@ -1,0 +1,16 @@
+# Solo per sviluppo locale: database PostgreSQL (npm run db:up)
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: falegnameria
+      POSTGRES_PASSWORD: falegnameria_dev
+      POSTGRES_DB: falegnameria
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - falegnameria_pgdata:/var/lib/postgresql/data
+
+volumes:
+  falegnameria_pgdata:

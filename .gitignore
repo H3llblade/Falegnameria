@@ -1,0 +1,48 @@
+# dipendenze
+/node_modules
+/.pnp
+.pnp.*
+
+# build Next.js
+/.next/
+/.next-build/
+/.next-prev/
+/.next-failed/
+/out/
+/build
+next-env.d.ts
+*.tsbuildinfo
+
+# file OCR copiati da node_modules (scripts/copy-tesseract.mjs)
+/public/tesseract/
+
+# segreti e configurazione locale
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+
+# database, backup, log
+*.dump
+*.sql.gz
+*.sqlite
+*.db
+/backups/
+/.deploy/
+*.log
+npm-debug.log*
+
+# test e strumenti
+/coverage
+/e2e-screens/
+/test-results/
+/playwright-report/
+
+# sistema
+.DS_Store
+*.swp
+.vscode/*
+!.vscode/extensions.json

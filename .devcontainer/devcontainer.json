@@ -1,0 +1,17 @@
+{
+  "name": "Falegnameria — Wild Lands 1900",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "forwardPorts": [3000],
+  "portsAttributes": { "3000": { "label": "Falegnameria", "onAutoForward": "openBrowser" } },
+  "postCreateCommand": "test -f .env || cp .env.example .env; npm ci && npx prisma migrate deploy",
+  "customizations": {
+    "vscode": {
+      "extensions": ["dbaeumer.vscode-eslint", "bradlc.vscode-tailwindcss", "Prisma.prisma", "esbenp.prettier-vscode"]
+    }
+  }
+}
