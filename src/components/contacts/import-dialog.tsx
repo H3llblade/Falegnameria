@@ -4,40 +4,60 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, ClipboardPaste, FileUp, ImageUp, Plus, ScanText, Trash2 } from "lucide-react";
 import { checkDuplicatesAction, importContactsAction } from "@/app/actions/contacts";
-import { contactSchema } from "@/lib/validation/schemas";
-import { parseCsv, type DupMatch } from "@/lib/contacts";
-import { FIELDS, LOW_CONFIDENCE, linesFromPlainText, parseContactsFromOcr, type Field } from "@/lib/ocr/parser";
+import { contactImportRowSchema } from "@/lib/validation/schemas";
+import { normalizeCode, normalizeName, parseCsv, type DupMatch } from "@/lib/contacts";
+import { LOW_CONFIDENCE, linesFromPlainText, parseContactsFromOcr, type ParsedContact } from "@/lib/ocr/parser";
 import { Modal } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/bits";
 import { useActionToast } from "@/components/ui/toast";
 
+type Field = "fullName" | "missiveCode" | "activity";
+const FIELDS: Field[] = ["fullName", "missiveCode", "activity"];
+const LABELS: Record<Field, string> = { fullName: "Nome e cognome", missiveCode: "Codice missiva", activity: "Attività" };
+
 type Row = {
   key: number;
   include: boolean;
-  firstName: string;
-  lastName: string;
+  fullName: string;
   missiveCode: string;
   activity: string;
-  city: string;
   confidence: Partial<Record<Field, number>>;
-  warnings: string[];
   dups: DupMatch[];
-  source?: string;
 };
 
-const LABELS: Record<Field, string> = { firstName: "Nome", lastName: "Cognome", missiveCode: "Codice missiva", activity: "Attività" };
+/** Il codice missiva non contiene spazi */
+const stripSpaces = (s: string) => s.replace(/\s+/g, "");
+
+const splitName = (fullName: string) => {
+  const [firstName = "", ...rest] = fullName.trim().split(/\s+/);
+  return { firstName, lastName: rest.join(" ") };
+};
+
+const joinName = (firstName: string, lastName: string) => [firstName, lastName].map((x) => x.trim()).filter(Boolean).join(" ");
+
+const fromParsed = (p: ParsedContact): Row => {
+  const nameConf = [p.confidence.firstName, p.confidence.lastName].filter((c): c is number => c !== undefined && c > 0);
+  return {
+    ...blankRow(),
+    fullName: joinName(p.firstName, p.lastName),
+    missiveCode: stripSpaces(p.missiveCode),
+    activity: p.activity,
+    confidence: {
+      fullName: nameConf.length ? Math.min(...nameConf) : 0,
+      missiveCode: p.confidence.missiveCode,
+      activity: p.confidence.activity,
+    },
+  };
+};
 
 let keySeq = 1;
 const blankRow = (): Row => ({
   key: keySeq++,
   include: true,
-  firstName: "",
-  lastName: "",
+  fullName: "",
   missiveCode: "",
   activity: "",
-  city: "",
   confidence: {},
-  warnings: [],
   dups: [],
 });
 
@@ -76,17 +96,21 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
 
   const checkDups = useCallback(async (list: Row[]) => {
     setChecking(true);
-    const r = await checkDuplicatesAction(list.map((x) => ({ firstName: x.firstName, lastName: x.lastName, missiveCode: x.missiveCode })));
+    const r = await checkDuplicatesAction(list.map((x) => ({ ...splitName(x.fullName), missiveCode: x.missiveCode })));
     setChecking(false);
     if (!r.ok) return list;
-    // Duplicati anche all'interno dello stesso lotto
-    const seen = new Map<string, number>();
+    // Doppioni anche all'interno dello stesso lotto (verranno accorpati alla riga precedente)
+    const seenCode = new Map<string, number>();
+    const seenName = new Map<string, number>();
     return list.map((x, i) => {
       const dups = [...(r.data?.[i] ?? [])];
-      const k = x.missiveCode.trim().toUpperCase();
-      if (k && seen.has(k)) dups.push({ id: "", reason: "codice", label: `riga ${seen.get(k)! + 1} di questa importazione` });
-      else if (k) seen.set(k, i);
-      return { ...x, dups, include: x.include && dups.length === 0 };
+      const code = normalizeCode(x.missiveCode);
+      const name = normalizeName(x.fullName);
+      const prev = (code ? seenCode.get(code) : undefined) ?? (name.length > 1 ? seenName.get(name) : undefined);
+      if (dups.length === 0 && prev !== undefined) dups.push({ id: "", reason: seenCode.get(code) === prev ? "codice" : "nome", label: `riga ${prev + 1} di questa importazione` });
+      if (code && !seenCode.has(code)) seenCode.set(code, i);
+      if (name.length > 1 && !seenName.has(name)) seenName.set(name, i);
+      return { ...x, dups };
     });
   }, []);
 
@@ -121,7 +145,7 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
         bmp.close();
         const lines = await recognize(canvas, setProgress);
         setRawText(lines.map((l) => l.text).join("\n"));
-        const parsed = parseContactsFromOcr(lines).map((p) => ({ ...blankRow(), ...p, city: "", dups: [] }));
+        const parsed = parseContactsFromOcr(lines).map(fromParsed);
         if (parsed.length === 0) setError("Nessun contatto riconosciuto con certezza: è possibile inserirli a mano qui sotto.");
         await toReview(parsed, "ocr");
       } catch (e) {
@@ -170,20 +194,18 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
     const csv = parseCsv(t);
     const header = csv[0]?.map((h) => h.toLowerCase()) ?? [];
     const idx = (re: RegExp) => header.findIndex((h) => re.test(h));
-    const iFn = idx(/^nome$/), iLn = idx(/cognome/), iCode = idx(/codice|missiva/), iAct = idx(/attivit|descr|mestiere/), iCity = idx(/citt/);
-    if (csv.length > 1 && iFn >= 0 && iLn >= 0 && iCode >= 0) {
+    const iFull = idx(/^nome\s*(e|&|\/)\s*cognome$/), iFn = idx(/^nome$/), iLn = idx(/^cognome$/), iCode = idx(/codice|missiva/), iAct = idx(/attivit|descr|mestiere/);
+    if (csv.length > 1 && (iFull >= 0 || iFn >= 0) && iCode >= 0) {
       const parsed = csv.slice(1).map((r) => ({
         ...blankRow(),
-        firstName: r[iFn] ?? "",
-        lastName: r[iLn] ?? "",
-        missiveCode: (r[iCode] ?? "").replace(/^'/, ""),
+        fullName: iFull >= 0 ? (r[iFull] ?? "").trim() : joinName(r[iFn] ?? "", iLn >= 0 ? (r[iLn] ?? "") : ""),
+        missiveCode: stripSpaces((r[iCode] ?? "").replace(/^'/, "")),
         activity: iAct >= 0 ? (r[iAct] ?? "") : "",
-        city: iCity >= 0 ? (r[iCity] ?? "") : "",
-        confidence: { firstName: 100, lastName: 100, missiveCode: 100, activity: 100 },
+        confidence: { fullName: 100, missiveCode: 100, activity: 100 },
       }));
       return toReview(parsed, "csv");
     }
-    const parsed = parseContactsFromOcr(linesFromPlainText(t)).map((p) => ({ ...blankRow(), ...p, city: "", dups: [] }));
+    const parsed = parseContactsFromOcr(linesFromPlainText(t)).map(fromParsed);
     if (parsed.length === 0) setError("Nessun contatto riconosciuto: correggere il testo o inserire le righe a mano.");
     toReview(parsed, "csv");
   };
@@ -199,7 +221,7 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
       }),
     );
 
-  const validity = rows.map((r) => contactSchema.safeParse(r));
+  const validity = rows.map((r) => contactImportRowSchema.safeParse(r));
   const selected = rows.filter((r, i) => r.include && validity[i].success);
   const invalidSelected = rows.filter((r, i) => r.include && !validity[i].success).length;
 
@@ -207,12 +229,13 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
     if (selected.length === 0) return;
     setSaving(true);
     const r = await importContactsAction(
-      { rows: selected.map(({ firstName, lastName, missiveCode, activity, city }) => ({ firstName, lastName, missiveCode, activity, city, notes: "" })) },
+      { rows: selected.map(({ fullName, missiveCode, activity }) => ({ fullName, missiveCode, activity })) },
       source,
     );
     setSaving(false);
     if (r.ok) {
-      toast({ ok: true, message: `${r.data!.count} contatti importati in rubrica` });
+      const { created, merged } = r.data!;
+      toast({ ok: true, message: `${created} contatti aggiunti, ${merged} accorpati a contatti esistenti` });
       router.refresh();
       onDone();
     } else toast(r);
@@ -244,8 +267,8 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
           <div className="min-w-0 flex-1 space-y-1">
             <p className="font-heading">Verificate e correggete i dati prima di salvarli.</p>
             <p className="font-fell italic text-ink-soft">
-              I campi evidenziati hanno una lettura incerta. Nulla viene salvato finché non confermate. Le righe con possibili duplicati sono
-              deselezionate.
+              I campi evidenziati hanno una lettura incerta. Nulla viene salvato finché non confermate. I doppioni (stesso codice missiva o
+              stesso nome e cognome) vengono accorpati al contatto già presente, aggiornandone i dati.
             </p>
             {error && (
               <p className="font-fell italic text-bordeaux" role="alert">
@@ -257,7 +280,7 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="ledger min-w-[56rem]">
+          <table className="ledger min-w-[44rem]">
             <thead>
               <tr>
                 <th className="w-10">
@@ -268,7 +291,6 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
                     {LABELS[f]} <span className="text-bordeaux">*</span>
                   </th>
                 ))}
-                <th>Città</th>
                 <th>
                   <span className="sr-only">Azioni</span>
                 </th>
@@ -293,7 +315,7 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
                             value={r[f]}
                             aria-label={`${LABELS[f]} riga ${i + 1}`}
                             aria-invalid={r.include && issues[f] ? true : undefined}
-                            onChange={(e) => update(r.key, { [f]: e.target.value })}
+                            onChange={(e) => update(r.key, { [f]: f === "missiveCode" ? stripSpaces(e.target.value) : e.target.value })}
                           />
                           {low && (
                             <span className="mt-0.5 flex items-center gap-1 font-fell text-xs italic text-sepia">
@@ -304,9 +326,6 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
                         </td>
                       );
                     })}
-                    <td>
-                      <input className="input !min-h-[2.2rem] !py-1 !text-base" value={r.city} aria-label={`Città riga ${i + 1}`} onChange={(e) => update(r.key, { city: e.target.value })} />
-                    </td>
                     <td>
                       <button type="button" className="btn btn-ghost btn-sm text-bordeaux" onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))} aria-label={`Elimina riga ${i + 1}`}>
                         <Trash2 size={15} aria-hidden />
@@ -319,8 +338,8 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
                 r.dups.length ? (
                   <tr key={`d${r.key}`} className="!bg-transparent">
                     <td />
-                    <td colSpan={6} className="!pt-0 font-fell text-sm italic text-bordeaux">
-                      {r.firstName} {r.lastName}: possibile duplicato di {r.dups.map((d) => `${d.label} (${d.reason})`).join(", ")}
+                    <td colSpan={4} className="!pt-0 font-fell text-sm italic text-sepia">
+                      {r.fullName || r.missiveCode}: verrà accorpato a {r.dups[0].label} (stesso {r.dups[0].reason})
                     </td>
                   </tr>
                 ) : null,
@@ -341,7 +360,7 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
             <button type="button" className="btn btn-paper btn-sm" onClick={() => setRows((rs) => [...rs, blankRow()])}>
               <Plus size={15} aria-hidden /> Aggiungi riga a mano
             </button>
-            <button type="button" className="btn btn-paper btn-sm" disabled={checking} onClick={async () => setRows(await checkDups(rows.map((r) => ({ ...r, include: true }))))}>
+            <button type="button" className="btn btn-paper btn-sm" disabled={checking} onClick={async () => setRows(await checkDups(rows))}>
               Ricontrolla duplicati
             </button>
             <button
@@ -423,7 +442,7 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
       ) : (
         <div className="space-y-3">
           <p className="font-fell italic text-ink-soft">
-            Incollate un CSV con intestazione (Nome; Cognome; Codice missiva; Attività; Città) oppure righe di testo libero come «Mario Rossi – 00123 –
+            Incollate un CSV con intestazione (Nome e cognome; Codice missiva; Attività) oppure righe di testo libero come «Mario Rossi – 00123 –
             Fabbro».
           </p>
           <textarea className="input min-h-48 font-type !text-sm" value={rawText} onChange={(e) => setRawText(e.target.value)} aria-label="Testo o CSV da importare" />

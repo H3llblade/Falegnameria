@@ -27,10 +27,11 @@ const dateString = (label: string) =>
     .trim()
     .refine((v) => v === "" || (/^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v))), `${label}: data non valida`);
 
-export const missiveCodeSchema = required("Codice missiva", 40).refine(
-  (v) => /^[\p{L}\p{N}#\-_. /]+$/u.test(v),
-  "Codice missiva: caratteri non ammessi",
-);
+/** Codice missiva: gli spazi vengono rimossi (non fanno parte del codice) */
+export const missiveCodeSchema = z
+  .string()
+  .transform((v) => v.replace(/\s+/g, ""))
+  .pipe(required("Codice missiva", 40).refine((v) => /^[\p{L}\p{N}#\-_./]+$/u.test(v), "Codice missiva: caratteri non ammessi"));
 
 // ---------------- Contatti ----------------
 export const contactSchema = z.object({
@@ -43,8 +44,15 @@ export const contactSchema = z.object({
 });
 export type ContactInput = z.input<typeof contactSchema>;
 
+/** Riga di importazione: nome e cognome in un unico campo (prima parola = nome, il resto = cognome) */
+export const contactImportRowSchema = z.object({
+  fullName: required("Nome e cognome", 160).refine((v) => v.split(/\s+/).length >= 2, "Indicare nome e cognome"),
+  missiveCode: missiveCodeSchema,
+  activity: required("Descrizione attività", 200),
+});
+
 export const contactImportSchema = z.object({
-  rows: z.array(contactSchema).min(1, "Nessun contatto da importare").max(300, "Massimo 300 contatti per volta"),
+  rows: z.array(contactImportRowSchema).min(1, "Nessun contatto da importare").max(300, "Massimo 300 contatti per volta"),
 });
 
 // ---------------- Ordini ----------------

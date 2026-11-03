@@ -4,7 +4,7 @@
  */
 import { PrismaClient } from "@prisma/client";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { createContact, deleteContact } from "@/lib/services/contacts";
+import { createContact, deleteContact, importContacts } from "@/lib/services/contacts";
 import { addPayment, createOrder, editPayment, updateOrder, voidPayment } from "@/lib/services/orders";
 import { createRecipe, updateRecipe } from "@/lib/services/recipes";
 import { createAnnouncement, updateAnnouncement } from "@/lib/services/announcements";
@@ -175,5 +175,26 @@ d("scenari del gestionale", () => {
     const results = await Promise.allSettled(Array.from({ length: 5 }, () => addPayment(db, o.id, { amount: "6" }, userId)));
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
     expect((await db.order.findUniqueOrThrow({ where: { id: o.id } })).paidCents).toBe(600);
+  });
+
+  it("Importazione contatti — codice senza spazi, doppioni accorpati", async () => {
+    const c = await createContact(db, contactInput, userId);
+    const r = await importContacts(
+      db,
+      {
+        rows: [
+          { fullName: "Arthur Morgan", missiveCode: "004 51", activity: "Pistolero" }, // stesso codice → accorpato
+          { fullName: "John Marston", missiveCode: "CH 856", activity: "Allevatore" },
+          { fullName: "Jack Marston", missiveCode: "CH856", activity: "Scrittore" }, // doppione nel lotto
+        ],
+      },
+      userId,
+      "csv",
+    );
+    expect(r).toEqual({ created: 1, merged: 2 });
+    const all = await db.contact.findMany({ orderBy: { createdAt: "asc" } });
+    expect(all).toHaveLength(2);
+    expect(all[0]).toMatchObject({ id: c.id, firstName: "Arthur", lastName: "Morgan", missiveCode: "00451", activity: "Pistolero", city: "Valentine" });
+    expect(all[1]).toMatchObject({ firstName: "Jack", lastName: "Marston", missiveCode: "CH856", activity: "Scrittore" });
   });
 });

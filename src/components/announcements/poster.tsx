@@ -22,7 +22,7 @@ export function Poster({ a, compact }: { a: PosterData; compact?: boolean }) {
       <div className="mx-auto my-1.5 h-[3px] w-2/3 border-y border-ink/70" aria-hidden />
       <h2 className={`font-display leading-[1.05] break-words ${compact ? "text-[1.55rem]" : "text-4xl sm:text-5xl"}`}>{a.title || "Titolo del manifesto"}</h2>
       <Flourish className="my-3 text-ink/70" />
-      <p className={`user-text text-left ${compact ? "line-clamp-[8] text-[1rem]" : "drop-cap text-[1.15rem] leading-relaxed"}`}>
+      <p className={`user-text text-left ${compact ? "line-clamp-[8] text-[1rem]" : "text-[1.15rem] leading-relaxed"}`}>
         {a.content || "Il testo dell'annuncio comparirà qui."}
       </p>
       <div className="mt-auto pt-4">

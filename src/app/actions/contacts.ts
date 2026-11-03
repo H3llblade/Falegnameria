@@ -56,12 +56,12 @@ export async function checkDuplicatesAction(rows: unknown, excludeId?: string): 
   });
 }
 
-export async function importContactsAction(raw: unknown, source: string): Promise<ActionResult<{ count: number }>> {
+export async function importContactsAction(raw: unknown, source: string): Promise<ActionResult<{ created: number; merged: number }>> {
   return runAction(async () => {
     const me = await requireUser();
-    const count = await svc.importContacts(prisma, raw, me.id, source === "ocr" ? "ocr" : "csv");
+    const r = await svc.importContacts(prisma, raw, me.id, source === "ocr" ? "ocr" : "csv");
     refresh();
-    return { count };
+    return r;
   });
 }
 

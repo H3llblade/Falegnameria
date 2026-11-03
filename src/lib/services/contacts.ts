@@ -80,12 +80,40 @@ export async function archiveContact(db: PrismaClient, id: string, archived: boo
   });
 }
 
+/** Divide "Nome Cognome": la prima parola è il nome, il resto il cognome */
+export function splitImportName(fullName: string): { firstName: string; lastName: string } {
+  const [firstName = "", ...rest] = fullName.trim().split(/\s+/);
+  return { firstName, lastName: rest.join(" ") };
+}
+
+/**
+ * Importa i contatti. Un doppione (stesso codice missiva oppure stesso nome e cognome,
+ * in rubrica o in una riga precedente dello stesso lotto) viene accorpato al contatto
+ * esistente: nome, cognome, codice e attività vengono aggiornati, città e note restano.
+ */
 export async function importContacts(db: PrismaClient, raw: unknown, userId: string, source: string) {
   const { rows } = contactImportSchema.parse(raw);
   return db.$transaction(async (tx) => {
-    const created = [];
-    for (const r of rows) created.push(await tx.contact.create({ data: toData(r) }));
-    await audit(tx, { userId, action: "import", entity: "Contact", details: { count: created.length, source } });
-    return created.length;
+    const existing = await tx.contact.findMany({ select: { id: true, firstName: true, lastName: true, missiveCode: true } });
+    let created = 0;
+    const merged = new Set<string>();
+    for (const r of rows) {
+      const data = { ...splitImportName(r.fullName), missiveCode: r.missiveCode, activity: r.activity };
+      const dup = findDuplicates(data, existing)[0];
+      if (dup) {
+        const before = await tx.contact.findUnique({ where: { id: dup.id } });
+        await tx.contact.update({ where: { id: dup.id }, data });
+        await audit(tx, { userId, action: "update", entity: "Contact", entityId: dup.id, details: { before, mergedFrom: source } });
+        const e = existing.find((x) => x.id === dup.id)!;
+        Object.assign(e, data);
+        merged.add(dup.id);
+      } else {
+        const c = await tx.contact.create({ data });
+        existing.push({ id: c.id, ...data });
+        created++;
+      }
+    }
+    await audit(tx, { userId, action: "import", entity: "Contact", details: { created, merged: merged.size, source } });
+    return { created, merged: merged.size };
   });
 }

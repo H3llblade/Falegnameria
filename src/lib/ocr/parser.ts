@@ -63,14 +63,14 @@ function cleanName(s: string): string {
 }
 
 function cleanCode(s: string): string {
-  return cleanText(s).replace(/^[#:\s]+/, "").replace(/[\s,;|]+$/g, "");
+  return cleanText(s).replace(/^[#:\s]+/, "").replace(/[\s,;|]+$/g, "").replace(/\s+/g, "");
 }
 
 function cleanActivity(s: string): string {
   return cleanText(s).replace(/^[\s\-–—|:;,]+|[\s\-–—|:;,]+$/g, "");
 }
 
-function splitFullName(full: string): { firstName: string; lastName: string } {
+export function splitFullName(full: string): { firstName: string; lastName: string } {
   const f = cleanText(full);
   if (f.includes(",")) {
     const [last, first] = f.split(",", 2);
