@@ -8,7 +8,7 @@ name: Verifica e deploy
 # Secrets richiesti (Settings → Secrets and variables → Actions):
 #   VPS_HOST, VPS_USER, VPS_SSH_KEY   (chiave privata dedicata al deploy)
 #   VPS_PORT (facoltativo, default 22), VPS_KNOWN_HOSTS (facoltativo ma consigliato)
-# Variables (facoltative): AUTO_DEPLOY, DEPLOY_DIR (/Falegnameria), PM2_NAME (falegnameria),
+# Variables (facoltative): AUTO_DEPLOY, DEPLOY_DIR (/home/ubuntu/Falegnameria), PM2_NAME (falegnameria),
 #   PRODUCTION_BRANCH (main), PUBLIC_URL (https://falegnameria.devicloud.me)
 
 on:
@@ -77,7 +77,7 @@ jobs:
       group: deploy-production
       cancel-in-progress: false
     env:
-      DEPLOY_DIR: ${{ vars.DEPLOY_DIR || '/Falegnameria' }}
+      DEPLOY_DIR: ${{ vars.DEPLOY_DIR || '/home/ubuntu/Falegnameria' }}
       PM2_NAME: ${{ vars.PM2_NAME || 'falegnameria' }}
       BRANCH: ${{ vars.PRODUCTION_BRANCH || 'main' }}
       PUBLIC_URL: ${{ vars.PUBLIC_URL || 'https://falegnameria.devicloud.me' }}

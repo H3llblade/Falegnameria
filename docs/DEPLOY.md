@@ -95,7 +95,7 @@ In GitHub → Settings → Secrets and variables → Actions:
 | Secret | `VPS_PORT` | porta SSH, se diversa da 22 |
 | Secret | `VPS_KNOWN_HOSTS` | output di `ssh-keyscan -p PORTA HOST` (consigliato) |
 | Variable | `AUTO_DEPLOY` | `true` per il deploy automatico a ogni push su `main` |
-| Variable | `DEPLOY_DIR` | `/Falegnameria` (default) |
+| Variable | `DEPLOY_DIR` | `/home/ubuntu/Falegnameria` (default) |
 | Variable | `PM2_NAME` | `falegnameria` (default) |
 | Variable | `PRODUCTION_BRANCH` | `main` (default) |
 | Variable | `PUBLIC_URL` | `https://falegnameria.devicloud.me` (default) |
