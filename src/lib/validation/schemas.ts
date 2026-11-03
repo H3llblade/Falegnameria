@@ -35,20 +35,19 @@ export const missiveCodeSchema = z
 
 // ---------------- Contatti ----------------
 export const contactSchema = z.object({
-  firstName: required("Nome", 80),
-  lastName: required("Cognome", 80),
+  name: required("Nome e cognome", 160),
   missiveCode: missiveCodeSchema,
-  activity: required("Descrizione attività", 200),
+  activity: trimmed(200).optional().default(""),
   city: trimmed(80).optional().default(""),
   notes: trimmed(2000).optional().default(""),
 });
 export type ContactInput = z.input<typeof contactSchema>;
 
-/** Riga di importazione: nome e cognome in un unico campo (prima parola = nome, il resto = cognome) */
+/** Riga di importazione: nome, codice e attività (le note della missiva) */
 export const contactImportRowSchema = z.object({
-  fullName: required("Nome e cognome", 160).refine((v) => v.split(/\s+/).length >= 2, "Indicare nome e cognome"),
+  name: required("Nome e cognome", 160),
   missiveCode: missiveCodeSchema,
-  activity: required("Descrizione attività", 200),
+  activity: trimmed(200).optional().default(""),
 });
 
 export const contactImportSchema = z.object({
@@ -74,8 +73,7 @@ export const orderSchema = z
     // Validato solo se contactMode === "new" (vedi superRefine): i campi nascosti non bloccano il modulo
     newContact: z
       .object({
-        firstName: z.string().optional(),
-        lastName: z.string().optional(),
+        name: z.string().optional(),
         missiveCode: z.string().optional(),
         activity: z.string().optional(),
         city: z.string().optional(),

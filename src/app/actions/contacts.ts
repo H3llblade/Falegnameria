@@ -46,7 +46,7 @@ export async function archiveContactAction(id: string, archived: boolean): Promi
 }
 
 const dupInput = z
-  .array(z.object({ firstName: z.string().max(80), lastName: z.string().max(80), missiveCode: z.string().max(40) }))
+  .array(z.object({ name: z.string().max(160), missiveCode: z.string().max(40) }))
   .max(300);
 
 export async function checkDuplicatesAction(rows: unknown, excludeId?: string): Promise<ActionResult<DupMatch[][]>> {
@@ -71,9 +71,9 @@ export async function searchContactsAction(q: string): Promise<ActionResult<{ id
     const rows = await svc.listContacts(prisma, { q: String(q).slice(0, 80) });
     return rows.slice(0, 25).map((c) => ({
       id: c.id,
-      label: `${c.lastName} ${c.firstName}`,
+      label: c.name,
       missiveCode: c.missiveCode,
-      activity: c.activity,
+      activity: c.activity ?? "",
     }));
   });
 }

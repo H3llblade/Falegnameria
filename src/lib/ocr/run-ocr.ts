@@ -1,6 +1,7 @@
 "use client";
 
 import type { OcrLine } from "./parser";
+import { preprocessPixels } from "./preprocess";
 
 export const OCR_MAX_BYTES = 10 * 1024 * 1024;
 export const OCR_TYPES = ["image/png", "image/jpeg", "image/webp"];
@@ -37,21 +38,7 @@ export function preprocess(bmp: ImageBitmap): HTMLCanvasElement {
   ctx.imageSmoothingQuality = "high";
   ctx.drawImage(bmp, 0, 0, w, h);
   const img = ctx.getImageData(0, 0, w, h);
-  const d = img.data;
-  let sum = 0;
-  for (let i = 0; i < d.length; i += 4) {
-    const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-    d[i] = d[i + 1] = d[i + 2] = g;
-    sum += g;
-  }
-  const mean = sum / (d.length / 4);
-  const invert = mean < 120;
-  for (let i = 0; i < d.length; i += 4) {
-    let g = d[i];
-    if (invert) g = 255 - g;
-    g = Math.max(0, Math.min(255, (g - 128) * 1.35 + 128));
-    d[i] = d[i + 1] = d[i + 2] = g;
-  }
+  preprocessPixels(img.data, w, h);
   ctx.putImageData(img, 0, 0);
   return canvas;
 }

@@ -24,7 +24,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
   const cities = await prisma.contact.findMany({ where: { city: { not: null } }, distinct: ["city"], select: { city: true }, orderBy: { city: "asc" } });
   const groups = new Map<string, typeof contacts>();
   for (const c of contacts) {
-    const l = indexLetter(c.lastName);
+    const l = indexLetter(c.name);
     groups.set(l, [...(groups.get(l) ?? []), c]);
   }
   const present = new Set(groups.keys());
@@ -103,7 +103,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
                     <li key={c.id}>
                       <Link href={`/rubrica/${c.id}`} className="grid gap-x-4 py-2 hover:bg-brass/10 sm:grid-cols-[minmax(0,1.3fr)_8rem_minmax(0,1.5fr)_auto] sm:items-baseline">
                         <span className="text-[1.1rem]">
-                          <span className="font-heading">{c.lastName}</span> {c.firstName}
+                          <span className="font-heading">{c.name}</span>
                         </span>
                         <span className="num text-[0.95rem] text-sepia">✉ {c.missiveCode}</span>
                         <span className="truncate font-fell italic text-ink-soft">

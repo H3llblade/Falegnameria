@@ -17,7 +17,7 @@ const d = url ? describe : describe.skip;
 let db: PrismaClient;
 let userId: string;
 
-const contactInput = { firstName: "Arthur", lastName: "Morgan", missiveCode: "00451", activity: "Mandriano", city: "Valentine", notes: "" };
+const contactInput = { name: "Arthur Morgan", missiveCode: "00451", activity: "Mandriano", city: "Valentine", notes: "" };
 
 d("scenari del gestionale", () => {
   beforeAll(async () => {
@@ -161,10 +161,10 @@ d("scenari del gestionale", () => {
 
   it("ordine da rubrica con campi 'nuovo contatto' vuoti e ordine con nuovo contatto", async () => {
     const c = await createContact(db, contactInput, userId);
-    const empty = { firstName: "", lastName: "", missiveCode: "", activity: "", city: "", notes: "" };
+    const empty = { name: "", missiveCode: "", activity: "", city: "", notes: "" };
     const o = await createOrder(db, { contactMode: "existing", contactId: c.id, newContact: empty, title: "T", status: "RICEVUTO", items: [{ description: "A", quantity: "1", unitPrice: "1" }] }, userId);
     expect(o.contactId).toBe(c.id);
-    const o2 = await createOrder(db, { contactMode: "new", newContact: { ...empty, firstName: " Bill ", lastName: "Williamson", missiveCode: "007", activity: "Bandito" }, title: "T", status: "RICEVUTO", items: [{ description: "A", quantity: "1", unitPrice: "1" }] }, userId);
+    const o2 = await createOrder(db, { contactMode: "new", newContact: { ...empty, name: " Bill Williamson ", missiveCode: "007", activity: "Bandito" }, title: "T", status: "RICEVUTO", items: [{ description: "A", quantity: "1", unitPrice: "1" }] }, userId);
     expect(o2.customerName).toBe("Bill Williamson");
     expect(o2.customerMissive).toBe("007");
     await expect(createOrder(db, { contactMode: "new", newContact: empty, title: "T", status: "RICEVUTO", items: [{ description: "A", quantity: "1", unitPrice: "1" }] }, userId)).rejects.toThrow();
@@ -183,19 +183,21 @@ d("scenari del gestionale", () => {
       db,
       {
         rows: [
-          { fullName: "Arthur Morgan", missiveCode: "004 51", activity: "Pistolero" }, // stesso codice → accorpato
-          { fullName: "John Marston", missiveCode: "CH 856", activity: "Allevatore" },
-          { fullName: "Jack Marston", missiveCode: "CH856", activity: "Scrittore" }, // doppione nel lotto
-          { fullName: "Arthur Morgan", missiveCode: "999", activity: "Omonimo" }, // stesso nome, codice diverso → nuovo
+          { name: "Arthur Morgan", missiveCode: "004 51", activity: "Pistolero" }, // stesso codice → accorpato
+          { name: "John Marston", missiveCode: "CH 856", activity: "Allevatore" },
+          { name: "Jack Marston", missiveCode: "CH856", activity: "Scrittore" }, // doppione nel lotto
+          { name: "Arthur Morgan", missiveCode: "999", activity: "Omonimo" }, // stesso nome, codice diverso → nuovo
+          { name: "Sadie Adler", missiveCode: "SA 100", activity: "" }, // attività facoltativa
         ],
       },
       userId,
       "csv",
     );
-    expect(r).toEqual({ created: 2, merged: 2 });
+    expect(r).toEqual({ created: 3, merged: 2 });
     const all = await db.contact.findMany({ orderBy: { createdAt: "asc" } });
-    expect(all).toHaveLength(3);
-    expect(all[0]).toMatchObject({ id: c.id, firstName: "Arthur", lastName: "Morgan", missiveCode: "00451", activity: "Pistolero", city: "Valentine" });
-    expect(all[1]).toMatchObject({ firstName: "Jack", lastName: "Marston", missiveCode: "CH856", activity: "Scrittore" });
+    expect(all).toHaveLength(4);
+    expect(all[3]).toMatchObject({ name: "Sadie Adler", missiveCode: "SA100", activity: null });
+    expect(all[0]).toMatchObject({ id: c.id, name: "Arthur Morgan", missiveCode: "00451", activity: "Pistolero", city: "Valentine" });
+    expect(all[1]).toMatchObject({ name: "Jack Marston", missiveCode: "CH856", activity: "Scrittore" });
   });
 });

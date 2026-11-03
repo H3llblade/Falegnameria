@@ -14,7 +14,7 @@ import { applyServerErrors, FieldShell, Input, Select, Textarea } from "@/compon
 import { useActionToast } from "@/components/ui/toast";
 import { Flourish } from "@/components/ui/bits";
 
-export type ContactOption = { id: string; firstName: string; lastName: string; missiveCode: string; activity: string };
+export type ContactOption = { id: string; name: string; missiveCode: string; activity: string };
 export type RecipeOption = {
   id: string;
   name: string;
@@ -51,7 +51,7 @@ export function OrderForm({
   const defaults: OrderInput = initial ?? {
     contactMode: contacts.length ? "existing" : "new",
     contactId: presetContactId ?? "",
-    newContact: { firstName: "", lastName: "", missiveCode: "", activity: "", city: "", notes: "" },
+    newContact: { name: "", missiveCode: "", activity: "", city: "", notes: "" },
     customerName: "",
     customerMissive: "",
     title: presetRecipe?.name ?? "",
@@ -138,7 +138,7 @@ export function OrderForm({
   const filteredContacts = useMemo(() => {
     const f = contactFilter.trim().toLowerCase();
     if (!f) return contacts;
-    return contacts.filter((c) => `${c.lastName} ${c.firstName} ${c.missiveCode} ${c.activity}`.toLowerCase().includes(f));
+    return contacts.filter((c) => `${c.name} ${c.missiveCode} ${c.activity}`.toLowerCase().includes(f));
   }, [contacts, contactFilter]);
   const selectedContact = contacts.find((c) => c.id === contactId);
 
@@ -213,26 +213,26 @@ export function OrderForm({
           {contactMode === "existing" && (
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
               <FieldShell label="Filtra la rubrica" htmlFor="cfilter">
-                <Input id="cfilter" placeholder="Cognome, codice, attività…" value={contactFilter} onChange={(e) => setContactFilter(e.target.value)} />
+                <Input id="cfilter" placeholder="Nome, codice, attività…" value={contactFilter} onChange={(e) => setContactFilter(e.target.value)} />
               </FieldShell>
               <FieldShell label="Contatto" htmlFor="contactId" required error={errors.contactId}>
                 <Select id="contactId" invalid={!!errors.contactId} {...register("contactId")}>
                   <option value="">— Selezionare —</option>
                   {filteredContacts.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.lastName} {c.firstName} · {c.missiveCode}
+                      {c.name} · {c.missiveCode}
                     </option>
                   ))}
                   {selectedContact && !filteredContacts.includes(selectedContact) && (
                     <option value={selectedContact.id}>
-                      {selectedContact.lastName} {selectedContact.firstName} · {selectedContact.missiveCode}
+                      {selectedContact.name} · {selectedContact.missiveCode}
                     </option>
                   )}
                 </Select>
               </FieldShell>
               {selectedContact && (
                 <p className="font-fell italic text-ink-soft sm:col-span-2">
-                  {selectedContact.activity} — codice missiva <span className="num not-italic">{selectedContact.missiveCode}</span>
+                  {selectedContact.activity ? `${selectedContact.activity} — ` : ""}codice missiva <span className="num not-italic">{selectedContact.missiveCode}</span>
                 </p>
               )}
             </div>
@@ -240,16 +240,13 @@ export function OrderForm({
 
           {contactMode === "new" && (
             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <FieldShell label="Nome" htmlFor="nc-fn" required error={err("newContact.firstName")}>
-                <Input id="nc-fn" invalid={!!err("newContact.firstName")} {...register("newContact.firstName")} />
-              </FieldShell>
-              <FieldShell label="Cognome" htmlFor="nc-ln" required error={err("newContact.lastName")}>
-                <Input id="nc-ln" invalid={!!err("newContact.lastName")} {...register("newContact.lastName")} />
+              <FieldShell label="Nome e cognome" htmlFor="nc-name" required error={err("newContact.name")}>
+                <Input id="nc-name" invalid={!!err("newContact.name")} {...register("newContact.name")} />
               </FieldShell>
               <FieldShell label="Codice missiva" htmlFor="nc-code" required error={err("newContact.missiveCode")}>
                 <Input id="nc-code" className="num" invalid={!!err("newContact.missiveCode")} {...register("newContact.missiveCode")} />
               </FieldShell>
-              <FieldShell label="Descrizione attività" htmlFor="nc-act" required error={err("newContact.activity")}>
+              <FieldShell label="Descrizione attività" htmlFor="nc-act" error={err("newContact.activity")}>
                 <Input id="nc-act" invalid={!!err("newContact.activity")} {...register("newContact.activity")} />
               </FieldShell>
               <FieldShell label="Città" htmlFor="nc-city">

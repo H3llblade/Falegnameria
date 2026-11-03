@@ -13,10 +13,10 @@ export default async function EditContactPage({ params }: { params: Promise<{ id
   if (!c) notFound();
   return (
     <div>
-      <PageHeader title="Modifica contatto" kicker={`${c.lastName} ${c.firstName}`} />
+      <PageHeader title="Modifica contatto" kicker={c.name} />
       <ContactForm
         id={c.id}
-        initial={{ firstName: c.firstName, lastName: c.lastName, missiveCode: c.missiveCode, activity: c.activity, city: c.city ?? "", notes: c.notes ?? "" }}
+        initial={{ name: c.name, missiveCode: c.missiveCode, activity: c.activity ?? "", city: c.city ?? "", notes: c.notes ?? "" }}
       />
     </div>
   );

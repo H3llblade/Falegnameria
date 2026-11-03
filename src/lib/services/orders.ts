@@ -60,22 +60,21 @@ async function resolveCustomer(tx: Tx, data: OrderData, userId: string) {
   if (data.contactMode === "existing") {
     const c = await tx.contact.findUnique({ where: { id: data.contactId } });
     if (!c) throw new DomainError("Contatto non trovato", { contactId: "Contatto inesistente" });
-    return { contactId: c.id, customerName: `${c.firstName} ${c.lastName}`, customerMissive: c.missiveCode };
+    return { contactId: c.id, customerName: c.name, customerMissive: c.missiveCode };
   }
   if (data.contactMode === "new") {
     const nc = contactSchema.parse(data.newContact ?? {});
     const c = await tx.contact.create({
       data: {
-        firstName: nc.firstName,
-        lastName: nc.lastName,
+        name: nc.name,
         missiveCode: nc.missiveCode,
-        activity: nc.activity,
+        activity: nc.activity || null,
         city: nc.city || null,
         notes: nc.notes || null,
       },
     });
     await audit(tx, { userId, action: "create", entity: "Contact", entityId: c.id, details: { via: "ordine" } });
-    return { contactId: c.id, customerName: `${c.firstName} ${c.lastName}`, customerMissive: c.missiveCode };
+    return { contactId: c.id, customerName: c.name, customerMissive: c.missiveCode };
   }
   return { contactId: null, customerName: data.customerName, customerMissive: data.customerMissive };
 }

@@ -6,7 +6,7 @@ export async function orderFormOptions(db: PrismaClient): Promise<{ contacts: Co
   const [contacts, recipes] = await Promise.all([
     db.contact.findMany({
       where: { archivedAt: null },
-      select: { id: true, firstName: true, lastName: true, missiveCode: true, activity: true },
+      select: { id: true, name: true, missiveCode: true, activity: true },
     }),
     db.recipe.findMany({
       where: { archivedAt: null },
@@ -15,7 +15,7 @@ export async function orderFormOptions(db: PrismaClient): Promise<{ contacts: Co
     }),
   ]);
   return {
-    contacts: sortContacts(contacts),
+    contacts: sortContacts(contacts).map((c) => ({ ...c, activity: c.activity ?? "" })),
     recipes: recipes.map((r) => ({
       id: r.id,
       name: r.name,

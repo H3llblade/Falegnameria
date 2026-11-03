@@ -41,7 +41,7 @@ export default async function EditOrderPage({ params }: { params: Promise<{ id: 
         initial={{
           contactMode: contactKnown ? "existing" : "none",
           contactId: contactKnown ? order.contactId! : "",
-          newContact: { firstName: "", lastName: "", missiveCode: "", activity: "", city: "", notes: "" },
+          newContact: { name: "", missiveCode: "", activity: "", city: "", notes: "" },
           customerName: order.customerName,
           customerMissive: order.customerMissive,
           title: order.title,

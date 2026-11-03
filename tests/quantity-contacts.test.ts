@@ -21,21 +21,9 @@ describe("materiali", () => {
 });
 
 describe("rubrica", () => {
-  it("ordinamento italiano per cognome poi nome, case-insensitive", () => {
-    const sorted = sortContacts([
-      { firstName: "Luca", lastName: "zanetti" },
-      { firstName: "Anna", lastName: "Èrcole" },
-      { firstName: "Bruno", lastName: "Rossi" },
-      { firstName: "Aldo", lastName: "rossi" },
-      { firstName: "Carla", lastName: "D'Angelo" },
-    ]);
-    expect(sorted.map((c) => `${c.lastName} ${c.firstName}`)).toEqual([
-      "D'Angelo Carla",
-      "Èrcole Anna",
-      "rossi Aldo",
-      "Rossi Bruno",
-      "zanetti Luca",
-    ]);
+  it("ordinamento italiano per nome completo, case-insensitive", () => {
+    const sorted = sortContacts([{ name: "zanetti Luca" }, { name: "Èrcole Anna" }, { name: "Rossi Bruno" }, { name: "rossi Aldo" }, { name: "D'Angelo Carla" }]);
+    expect(sorted.map((c) => c.name)).toEqual(["D'Angelo Carla", "Èrcole Anna", "rossi Aldo", "Rossi Bruno", "zanetti Luca"]);
   });
   it("lettera indice", () => {
     expect(indexLetter("Èrcole")).toBe("E");
@@ -43,12 +31,12 @@ describe("rubrica", () => {
   });
   it("duplicati per codice e per nome", () => {
     const existing = [
-      { id: "1", firstName: "Mario", lastName: "Rossi", missiveCode: "00123" },
-      { id: "2", firstName: "Anna", lastName: "Bianchi", missiveCode: "555" },
+      { id: "1", name: "Mario Rossi", missiveCode: "00123" },
+      { id: "2", name: "Anna Bianchi", missiveCode: "555" },
     ];
-    expect(findDuplicates({ firstName: "X", lastName: "Y", missiveCode: "#00123" }, existing)[0].reason).toBe("codice");
-    expect(findDuplicates({ firstName: "anna", lastName: "BIANCHI", missiveCode: "9" }, existing)[0].reason).toBe("nome");
-    expect(findDuplicates({ firstName: "Anna", lastName: "Verdi", missiveCode: "0123" }, existing)).toHaveLength(0);
+    expect(findDuplicates({ name: "X Y", missiveCode: "#00123" }, existing)[0].reason).toBe("codice");
+    expect(findDuplicates({ name: "anna BIANCHI", missiveCode: "9" }, existing)[0].reason).toBe("nome");
+    expect(findDuplicates({ name: "Anna Verdi", missiveCode: "0123" }, existing)).toHaveLength(0);
   });
   it("CSV: protezione formule e parsing", () => {
     expect(csvCell("=SUM(A1)")).toBe("'=SUM(A1)");

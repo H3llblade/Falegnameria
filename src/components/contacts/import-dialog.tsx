@@ -6,19 +6,18 @@ import { AlertTriangle, ClipboardPaste, FileUp, ImageUp, Plus, ScanText, Trash2 
 import { checkDuplicatesAction, importContactsAction } from "@/app/actions/contacts";
 import { contactImportRowSchema } from "@/lib/validation/schemas";
 import { normalizeCode, parseCsv, type DupMatch } from "@/lib/contacts";
-import { LOW_CONFIDENCE, linesFromPlainText, parseContactsFromOcr, type ParsedContact } from "@/lib/ocr/parser";
+import { FIELDS, LOW_CONFIDENCE, linesFromPlainText, parseContactsFromOcr, type Field, type ParsedContact } from "@/lib/ocr/parser";
 import { Modal } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/bits";
 import { useActionToast } from "@/components/ui/toast";
 
-type Field = "fullName" | "missiveCode" | "activity";
-const FIELDS: Field[] = ["fullName", "missiveCode", "activity"];
-const LABELS: Record<Field, string> = { fullName: "Nome e cognome", missiveCode: "Codice missiva", activity: "Attività" };
+const LABELS: Record<Field, string> = { name: "Nome e cognome", missiveCode: "Codice missiva", activity: "Attività / nota" };
+const REQUIRED: Record<Field, boolean> = { name: true, missiveCode: true, activity: false };
 
 type Row = {
   key: number;
   include: boolean;
-  fullName: string;
+  name: string;
   missiveCode: string;
   activity: string;
   confidence: Partial<Record<Field, number>>;
@@ -28,33 +27,21 @@ type Row = {
 /** Il codice missiva non contiene spazi */
 const stripSpaces = (s: string) => s.replace(/\s+/g, "");
 
-const splitName = (fullName: string) => {
-  const [firstName = "", ...rest] = fullName.trim().split(/\s+/);
-  return { firstName, lastName: rest.join(" ") };
-};
-
 const joinName = (firstName: string, lastName: string) => [firstName, lastName].map((x) => x.trim()).filter(Boolean).join(" ");
 
-const fromParsed = (p: ParsedContact): Row => {
-  const nameConf = [p.confidence.firstName, p.confidence.lastName].filter((c): c is number => c !== undefined && c > 0);
-  return {
-    ...blankRow(),
-    fullName: joinName(p.firstName, p.lastName),
-    missiveCode: stripSpaces(p.missiveCode),
-    activity: p.activity,
-    confidence: {
-      fullName: nameConf.length ? Math.min(...nameConf) : 0,
-      missiveCode: p.confidence.missiveCode,
-      activity: p.confidence.activity,
-    },
-  };
-};
+const fromParsed = (p: ParsedContact): Row => ({
+  ...blankRow(),
+  name: p.name,
+  missiveCode: stripSpaces(p.missiveCode),
+  activity: p.activity,
+  confidence: p.confidence,
+});
 
 let keySeq = 1;
 const blankRow = (): Row => ({
   key: keySeq++,
   include: true,
-  fullName: "",
+  name: "",
   missiveCode: "",
   activity: "",
   confidence: {},
@@ -96,7 +83,7 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
 
   const checkDups = useCallback(async (list: Row[]) => {
     setChecking(true);
-    const r = await checkDuplicatesAction(list.map((x) => ({ ...splitName(x.fullName), missiveCode: x.missiveCode })));
+    const r = await checkDuplicatesAction(list.map((x) => ({ name: x.name, missiveCode: x.missiveCode })));
     setChecking(false);
     if (!r.ok) return list;
     // Doppioni anche all'interno dello stesso lotto (verranno accorpati alla riga precedente)
@@ -192,14 +179,14 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
     const csv = parseCsv(t);
     const header = csv[0]?.map((h) => h.toLowerCase()) ?? [];
     const idx = (re: RegExp) => header.findIndex((h) => re.test(h));
-    const iFull = idx(/^nome\s*(e|&|\/)\s*cognome$/), iFn = idx(/^nome$/), iLn = idx(/^cognome$/), iCode = idx(/codice|missiva/), iAct = idx(/attivit|descr|mestiere/);
+    const iFull = idx(/^(nome\s*(e|&|\/)\s*cognome|nome contatto)$/), iFn = idx(/^nome$/), iLn = idx(/^cognome$/), iCode = idx(/codice|missiva/), iAct = idx(/attivit|descr|mestiere|^nota/);
     if (csv.length > 1 && (iFull >= 0 || iFn >= 0) && iCode >= 0) {
       const parsed = csv.slice(1).map((r) => ({
         ...blankRow(),
-        fullName: iFull >= 0 ? (r[iFull] ?? "").trim() : joinName(r[iFn] ?? "", iLn >= 0 ? (r[iLn] ?? "") : ""),
+        name: iFull >= 0 ? (r[iFull] ?? "").trim() : joinName(r[iFn] ?? "", iLn >= 0 ? (r[iLn] ?? "") : ""),
         missiveCode: stripSpaces((r[iCode] ?? "").replace(/^'/, "")),
         activity: iAct >= 0 ? (r[iAct] ?? "") : "",
-        confidence: { fullName: 100, missiveCode: 100, activity: 100 },
+        confidence: { name: 100, missiveCode: 100, activity: 100 },
       }));
       return toReview(parsed, "csv");
     }
@@ -227,7 +214,7 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
     if (selected.length === 0) return;
     setSaving(true);
     const r = await importContactsAction(
-      { rows: selected.map(({ fullName, missiveCode, activity }) => ({ fullName, missiveCode, activity })) },
+      { rows: selected.map(({ name, missiveCode, activity }) => ({ name, missiveCode, activity })) },
       source,
     );
     setSaving(false);
@@ -286,7 +273,7 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
                 </th>
                 {FIELDS.map((f) => (
                   <th key={f}>
-                    {LABELS[f]} <span className="text-bordeaux">*</span>
+                    {LABELS[f]} {REQUIRED[f] && <span className="text-bordeaux">*</span>}
                   </th>
                 ))}
                 <th>
@@ -305,7 +292,8 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
                     </td>
                     {FIELDS.map((f) => {
                       const conf = r.confidence[f] ?? 0;
-                      const low = conf < LOW_CONFIDENCE;
+                      // un'attività vuota non è un errore di lettura
+                      const low = conf < LOW_CONFIDENCE && (REQUIRED[f] || !!r[f]);
                       return (
                         <td key={f}>
                           <input
@@ -337,7 +325,7 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
                   <tr key={`d${r.key}`} className="!bg-transparent">
                     <td />
                     <td colSpan={4} className="!pt-0 font-fell text-sm italic text-sepia">
-                      {r.fullName || r.missiveCode}: verrà accorpato a {r.dups[0].label} (stesso codice)
+                      {r.name || r.missiveCode}: verrà accorpato a {r.dups[0].label} (stesso codice)
                     </td>
                   </tr>
                 ) : null,

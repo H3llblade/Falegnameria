@@ -82,11 +82,11 @@ model Session {
 
 model Contact {
   id          String    @id @default(cuid())
-  firstName   String
-  lastName    String
-  /// Identificativo Roleplay: sempre stringa (conserva gli zeri iniziali)
+  /// Nome e cognome in un unico campo
+  name        String
+  /// Identificativo Roleplay: sempre stringa (conserva gli zeri iniziali), senza spazi
   missiveCode String
-  activity    String
+  activity    String?
   city        String?
   notes       String?
   archivedAt  DateTime?
@@ -95,7 +95,7 @@ model Contact {
 
   orders Order[]
 
-  @@index([lastName, firstName])
+  @@index([name])
   @@index([missiveCode])
 }
 

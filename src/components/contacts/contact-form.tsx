@@ -23,24 +23,24 @@ export function ContactForm({ id, initial }: { id?: string; initial?: ContactInp
     formState: { errors, isSubmitting },
   } = useForm<ContactInput>({
     resolver: zodResolver(contactSchema),
-    defaultValues: initial ?? { firstName: "", lastName: "", missiveCode: "", activity: "", city: "", notes: "" },
+    defaultValues: initial ?? { name: "", missiveCode: "", activity: "", city: "", notes: "" },
   });
-  const [firstName, lastName, missiveCode] = useWatch({ control, name: ["firstName", "lastName", "missiveCode"] });
+  const [name, missiveCode] = useWatch({ control, name: ["name", "missiveCode"] });
   const [dups, setDups] = useState<DupMatch[]>([]);
   const [ackDup, setAckDup] = useState(false);
 
   // Controllo duplicati mentre si scrive
   useEffect(() => {
-    if (!missiveCode && !(firstName && lastName)) {
+    if (!missiveCode && !name) {
       setDups([]);
       return;
     }
     const t = setTimeout(async () => {
-      const r = await checkDuplicatesAction([{ firstName: firstName ?? "", lastName: lastName ?? "", missiveCode: missiveCode ?? "" }], id);
+      const r = await checkDuplicatesAction([{ name: name ?? "", missiveCode: missiveCode ?? "" }], id);
       if (r.ok) setDups(r.data?.[0] ?? []);
     }, 400);
     return () => clearTimeout(t);
-  }, [firstName, lastName, missiveCode, id]);
+  }, [name, missiveCode, id]);
 
   const onSubmit = async (v: ContactInput) => {
     if (dups.length > 0 && !ackDup) {
@@ -60,19 +60,16 @@ export function ContactForm({ id, initial }: { id?: string; initial?: ContactInp
   return (
     <form onSubmit={handleSubmit(onSubmit)} noValidate className="paper frame mx-auto max-w-2xl space-y-4 px-6 py-7 sm:px-10">
       <div className="grid gap-4 sm:grid-cols-2">
-        <FieldShell label="Nome" htmlFor="c-fn" required error={errors.firstName}>
-          <Input id="c-fn" autoComplete="off" invalid={!!errors.firstName} {...register("firstName")} />
+        <FieldShell label="Nome e cognome" htmlFor="c-name" required error={errors.name} className="sm:col-span-2">
+          <Input id="c-name" autoComplete="off" invalid={!!errors.name} {...register("name")} />
         </FieldShell>
-        <FieldShell label="Cognome" htmlFor="c-ln" required error={errors.lastName}>
-          <Input id="c-ln" autoComplete="off" invalid={!!errors.lastName} {...register("lastName")} />
-        </FieldShell>
-        <FieldShell label="Codice missiva" htmlFor="c-code" required error={errors.missiveCode} hint="Conservato così com'è, zeri iniziali compresi">
+        <FieldShell label="Codice missiva" htmlFor="c-code" required error={errors.missiveCode} hint="Senza spazi, zeri iniziali compresi">
           <Input id="c-code" className="num" autoComplete="off" invalid={!!errors.missiveCode} {...register("missiveCode")} />
         </FieldShell>
         <FieldShell label="Città" htmlFor="c-city" error={errors.city}>
           <Input id="c-city" {...register("city")} />
         </FieldShell>
-        <FieldShell label="Descrizione attività" htmlFor="c-act" required error={errors.activity} className="sm:col-span-2">
+        <FieldShell label="Descrizione attività" htmlFor="c-act" error={errors.activity} className="sm:col-span-2">
           <Input id="c-act" placeholder="Es. Allevatore di cavalli a Strawberry" invalid={!!errors.activity} {...register("activity")} />
         </FieldShell>
         <FieldShell label="Note" htmlFor="c-notes" className="sm:col-span-2">

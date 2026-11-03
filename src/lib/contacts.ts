@@ -2,10 +2,10 @@
 
 export const itCollator = new Intl.Collator("it", { sensitivity: "base", ignorePunctuation: true });
 
-export type NameLike = { firstName: string; lastName: string };
+export type NameLike = { name: string };
 
 export function compareContacts(a: NameLike, b: NameLike): number {
-  return itCollator.compare(a.lastName, b.lastName) || itCollator.compare(a.firstName, b.firstName);
+  return itCollator.compare(a.name, b.name);
 }
 
 export function sortContacts<T extends NameLike>(list: T[]): T[] {
@@ -13,8 +13,8 @@ export function sortContacts<T extends NameLike>(list: T[]): T[] {
 }
 
 /** Lettera indice per il registro alfabetico (accenti normalizzati) */
-export function indexLetter(lastName: string): string {
-  const ch = lastName
+export function indexLetter(name: string): string {
+  const ch = name
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .trim()
@@ -35,29 +35,23 @@ export function normalizeCode(s: string): string {
   return s.trim().toUpperCase().replace(/[\s#.\-_/]/g, "");
 }
 
-export type DupCandidate = { id: string; firstName: string; lastName: string; missiveCode: string };
+export type DupCandidate = { id: string; name: string; missiveCode: string };
 
 export type DupMatch = { id: string; reason: "codice" | "nome"; label: string };
 
-/** Possibili duplicati: stesso codice missiva oppure stesso nome+cognome (normalizzati) */
-export function findDuplicates(
-  row: { firstName: string; lastName: string; missiveCode: string },
-  existing: DupCandidate[],
-  excludeId?: string,
-): DupMatch[] {
+/** Possibili duplicati: stesso codice missiva oppure stesso nome e cognome (normalizzati) */
+export function findDuplicates(row: { name: string; missiveCode: string }, existing: DupCandidate[], excludeId?: string): DupMatch[] {
   const code = normalizeCode(row.missiveCode);
-  const full = normalizeName(row.firstName) + "|" + normalizeName(row.lastName);
-  const fullRev = normalizeName(row.lastName) + "|" + normalizeName(row.firstName);
+  const full = normalizeName(row.name);
   const out: DupMatch[] = [];
   for (const c of existing) {
     if (c.id === excludeId) continue;
-    const label = `${c.lastName} ${c.firstName} (${c.missiveCode})`;
+    const label = `${c.name} (${c.missiveCode})`;
     if (code && normalizeCode(c.missiveCode) === code) {
       out.push({ id: c.id, reason: "codice", label });
       continue;
     }
-    const cf = normalizeName(c.firstName) + "|" + normalizeName(c.lastName);
-    if (full.length > 1 && (cf === full || cf === fullRev)) out.push({ id: c.id, reason: "nome", label });
+    if (full.length > 1 && normalizeName(c.name) === full) out.push({ id: c.id, reason: "nome", label });
   }
   return out;
 }

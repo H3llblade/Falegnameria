@@ -10,8 +10,8 @@ import { RecordActions } from "@/components/ui/record-actions";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const c = await prisma.contact.findUnique({ where: { id }, select: { firstName: true, lastName: true } });
-  return { title: c ? `${c.lastName} ${c.firstName}` : "Contatto" };
+  const c = await prisma.contact.findUnique({ where: { id }, select: { name: true } });
+  return { title: c ? c.name : "Contatto" };
 }
 
 export default async function ContactDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -38,7 +38,7 @@ export default async function ContactDetail({ params }: { params: Promise<{ id: 
       <article className="paper frame print-sheet sheet-in mx-auto max-w-3xl px-6 py-8 sm:px-10">
         <p className="font-heading text-sm tracking-[0.3em] text-sepia uppercase">Scheda di rubrica</p>
         <h1 className="font-display text-3xl sm:text-4xl">
-          {c.lastName} <span className="font-fell">{c.firstName}</span>
+          {c.name}
         </h1>
         {c.archivedAt && <p className="font-fell italic text-ink-soft">(archiviato)</p>}
         <Flourish className="!mx-0 my-4 text-sepia" />
@@ -53,7 +53,7 @@ export default async function ContactDetail({ params }: { params: Promise<{ id: 
           </div>
           <div className="sm:col-span-2">
             <dt className="field-label">Attività</dt>
-            <dd className="text-lg">{c.activity}</dd>
+            <dd className="text-lg">{c.activity || "—"}</dd>
           </div>
           {c.notes && (
             <div className="sm:col-span-2">

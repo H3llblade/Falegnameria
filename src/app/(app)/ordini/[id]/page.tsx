@@ -24,7 +24,7 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
     include: {
       items: { orderBy: { sortOrder: "asc" }, include: { recipe: { select: { id: true, name: true } } } },
       payments: { orderBy: { paidAt: "asc" }, include: { createdBy: { select: { displayName: true } }, voidedBy: { select: { displayName: true } } } },
-      contact: { select: { id: true, firstName: true, lastName: true } },
+      contact: { select: { id: true, name: true } },
     },
   });
   if (!order) notFound();

@@ -14,8 +14,8 @@ export async function GET(req: Request) {
     archived: sp.get("archivio") === "1",
     withOrders: sp.get("ordini") === "1",
   });
-  const header = ["Cognome", "Nome", "Codice missiva", "Attività", "Città", "Note"];
-  const lines = [header.join(";"), ...rows.map((c) => [c.lastName, c.firstName, c.missiveCode, c.activity, c.city, c.notes].map(csvCell).join(";"))];
+  const header = ["Nome e cognome", "Codice missiva", "Attività", "Città", "Note"];
+  const lines = [header.join(";"), ...rows.map((c) => [c.name, c.missiveCode, c.activity, c.city, c.notes].map(csvCell).join(";"))];
   // BOM UTF-8 per l'apertura corretta in Excel/LibreOffice
   const body = "﻿" + lines.join("\r\n") + "\r\n";
   const date = new Date().toISOString().slice(0, 10);
