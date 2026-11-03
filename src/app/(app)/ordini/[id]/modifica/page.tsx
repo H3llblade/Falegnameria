@@ -1,3 +1,4 @@
+import { requirePageUser } from "@/lib/auth/session";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { centsToInput } from "@/lib/money";
@@ -9,6 +10,7 @@ import { PageHeader } from "@/components/ui/bits";
 export const metadata = { title: "Modifica ordine" };
 
 export default async function EditOrderPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePageUser();
   const { id } = await params;
   const order = await prisma.order.findUnique({ where: { id }, include: { items: { orderBy: { sortOrder: "asc" } } } });
   if (!order) notFound();

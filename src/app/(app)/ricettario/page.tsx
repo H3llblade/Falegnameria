@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { BookPlus } from "lucide-react";
 import { prisma } from "@/lib/db";
+import { viewerFor } from "@/lib/auth/session";
 import { formatCents } from "@/lib/money";
 import { itCollator } from "@/lib/contacts";
 import { EmptyState, Flourish, PageHeader } from "@/components/ui/bits";
@@ -11,8 +12,9 @@ export const metadata = { title: "Ricettario" };
 
 export default async function RecipesPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const sp = await searchParams;
+  const user = await viewerFor("ricettario", "/ricettario");
   const categories = await prisma.category.findMany({ where: { kind: "RECIPE" }, orderBy: [{ sortOrder: "asc" }, { name: "asc" }] });
-  const where: Prisma.RecipeWhereInput = { archivedAt: sp.archivio === "1" ? { not: null } : null };
+  const where: Prisma.RecipeWhereInput = { archivedAt: user && sp.archivio === "1" ? { not: null } : null };
   if (sp.categoria === "nessuna") where.categoryId = null;
   else if (sp.categoria) where.categoryId = sp.categoria;
   if (sp.q?.trim()) where.name = { contains: sp.q.trim(), mode: "insensitive" };
@@ -30,9 +32,11 @@ export default async function RecipesPage({ searchParams }: { searchParams: Prom
   return (
     <div>
       <PageHeader title="Ricettario" kicker="Manuale delle lavorazioni della bottega">
-        <Link href="/ricettario/nuova" className="btn btn-brass">
-          <BookPlus size={18} aria-hidden /> Nuova lavorazione
-        </Link>
+        {user && (
+          <Link href="/ricettario/nuova" className="btn btn-brass">
+            <BookPlus size={18} aria-hidden /> Nuova lavorazione
+          </Link>
+        )}
       </PageHeader>
       <FilterBar
         placeholder="Cerca una lavorazione per nome…"
@@ -42,21 +46,25 @@ export default async function RecipesPage({ searchParams }: { searchParams: Prom
             label: "Categoria",
             options: [{ value: "", label: "Tutte" }, ...categories.map((c) => ({ value: c.id, label: c.name })), { value: "nessuna", label: "Senza categoria" }],
           },
-          { name: "archivio", label: "Mostra", options: [{ value: "", label: "Attive" }, { value: "1", label: "Archiviate" }] },
+          ...(user ? [{ name: "archivio", label: "Mostra", options: [{ value: "", label: "Attive" }, { value: "1", label: "Archiviate" }] }] : []),
         ]}
       >
-        <Link href="/impostazioni#categorie" className="btn btn-ghost btn-sm self-end">
-          Gestisci categorie
-        </Link>
+        {user && (
+          <Link href="/impostazioni#categorie" className="btn btn-ghost btn-sm self-end">
+            Gestisci categorie
+          </Link>
+        )}
       </FilterBar>
 
       {groups.length === 0 ? (
         <EmptyState
           title="Il ricettario è ancora bianco"
           action={
-            <Link href="/ricettario/nuova" className="btn btn-ink">
-              Annota la prima lavorazione
-            </Link>
+            user ? (
+              <Link href="/ricettario/nuova" className="btn btn-ink">
+                Annota la prima lavorazione
+              </Link>
+            ) : undefined
           }
         >
           Registrate come si costruiscono i lavori della bottega: materiali, attrezzi e procedimento.

@@ -1,6 +1,8 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { audit } from "@/lib/audit";
@@ -10,8 +12,9 @@ import { clearFailures, isRateLimited, registerFailure } from "@/lib/auth/rate-l
 import { clientIp, createSession, destroySession, requireUser } from "@/lib/auth/session";
 import { loginSchema, passwordChangeSchema, userCreateSchema } from "@/lib/validation/schemas";
 import { DomainError } from "@/lib/services/errors";
+import { SECTIONS, setPublicSections } from "@/lib/services/settings";
 
-export type LoginState = { error?: string } | undefined;
+export type LoginState = { error?: string; username?: string } | undefined;
 
 export async function loginAction(_prev: LoginState, form: FormData): Promise<LoginState> {
   const parsed = loginSchema.safeParse({ username: form.get("username"), password: form.get("password") });
@@ -21,14 +24,14 @@ export async function loginAction(_prev: LoginState, form: FormData): Promise<Lo
   const keys = [`ip:${ip}`, `user:${username}`];
   const rl = isRateLimited(keys);
   if (rl.limited) {
-    return { error: `Troppi tentativi falliti. Riprovare tra ${Math.ceil(rl.retryAfterSec / 60)} minuti.` };
+    return { error: `Troppi tentativi falliti. Riprovare tra ${Math.ceil(rl.retryAfterSec / 60)} minuti.`, username };
   }
   const user = await prisma.user.findUnique({ where: { username } });
   const ok = await verifyPassword(parsed.data.password, user?.passwordHash ?? DUMMY_HASH);
   if (!user || !ok || !user.active) {
     registerFailure(keys);
     await audit(prisma, { action: "login_failed", entity: "User", details: { username: username.slice(0, 60), ip } });
-    return { error: "Credenziali non valide" };
+    return { error: "Credenziali non valide", username };
   }
   clearFailures(keys);
   await createSession(user.id);
@@ -90,6 +93,7 @@ export async function setUserActiveAction(userId: string, active: boolean): Prom
   return runAction(async () => {
     const me = await requireUser("ADMIN");
     if (userId === me.id) throw new DomainError("Non è possibile disattivare il proprio account");
+    if (!active) await assertNotLastAdmin(userId);
     await prisma.$transaction(async (tx) => {
       await tx.user.update({ where: { id: userId }, data: { active } });
       if (!active) await tx.session.deleteMany({ where: { userId } });
@@ -97,4 +101,69 @@ export async function setUserActiveAction(userId: string, active: boolean): Prom
     });
     revalidatePath("/impostazioni");
   }, active ? "Utente riattivato" : "Utente disattivato");
+}
+
+/** Password leggibile generata casualmente (senza caratteri ambigui come 0/O, 1/l) */
+function generatePassword(): string {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  const bytes = randomBytes(14);
+  let out = "";
+  for (const b of bytes) out += alphabet[b % alphabet.length];
+  // garantisce lettere e numeri
+  return `${out.slice(0, 6)}-${out.slice(6, 10)}-${(bytes[0] % 90) + 10}${out.slice(10)}`;
+}
+
+async function assertNotLastAdmin(userId: string) {
+  const target = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+  if (target.role !== "ADMIN") return;
+  const admins = await prisma.user.count({ where: { role: "ADMIN", active: true } });
+  if (admins <= 1) throw new DomainError("Deve restare almeno un amministratore attivo");
+}
+
+/**
+ * Reimposta la password di un utente. La nuova password viene restituita UNA sola volta
+ * (nel database resta solo l'hash): l'amministratore la comunica al gestore.
+ */
+export async function resetUserPasswordAction(userId: string): Promise<ActionResult<{ password: string }>> {
+  return runAction(async () => {
+    const me = await requireUser("ADMIN");
+    const password = generatePassword();
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: String(userId) }, data: { passwordHash: await hashPassword(password) } });
+      await tx.session.deleteMany({ where: { userId: String(userId) } });
+      await audit(tx, { userId: me.id, action: "password_reset", entity: "User", entityId: String(userId) });
+    });
+    return { password };
+  }, "Nuova password generata");
+}
+
+const userUpdateSchema = z.object({
+  displayName: z.string().trim().min(1, "Nome obbligatorio").max(80),
+  role: z.enum(["ADMIN", "STAFF"]),
+});
+
+export async function updateUserAction(userId: string, raw: unknown): Promise<ActionResult> {
+  return runAction(async () => {
+    const me = await requireUser("ADMIN");
+    const d = userUpdateSchema.parse(raw);
+    const id = String(userId);
+    if (d.role !== "ADMIN") {
+      if (id === me.id) throw new DomainError("Non potete togliere a voi stessi il ruolo di amministratore");
+      await assertNotLastAdmin(id);
+    }
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id }, data: { displayName: d.displayName, role: d.role } });
+      await audit(tx, { userId: me.id, action: "update", entity: "User", entityId: id, details: d });
+    });
+    revalidatePath("/impostazioni");
+  }, "Utente aggiornato");
+}
+
+export async function setPublicSectionsAction(sections: string[]): Promise<ActionResult> {
+  return runAction(async () => {
+    const me = await requireUser("ADMIN");
+    const list = z.array(z.enum(SECTIONS)).max(SECTIONS.length).parse(sections);
+    await setPublicSections(prisma, list, me.id);
+    revalidatePath("/", "layout");
+  }, "Visibilità pubblica aggiornata");
 }

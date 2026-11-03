@@ -132,6 +132,65 @@ await page.waitForSelector("text=contatti importati", { timeout: 15000 });
 await page.waitForTimeout(500);
 if (!(await page.textContent("main")).includes("Summers")) throw new Error("contatti importati non visibili in rubrica");
 await page.screenshot({ path: `${OUT}/10-rubrica.png`, fullPage: true });
+const contactUrl = new URL(BASE + "/rubrica").toString();
+
+step("permessi: visitatore senza accesso (sola lettura)");
+const anon = await (await browser.newContext({ locale: "it-IT" })).newPage();
+for (const path of ["/", "/ordini", new URL(orderUrl).pathname, "/strilloni", "/ricettario", "/rubrica"]) {
+  const res = await anon.goto(BASE + path);
+  if (new URL(anon.url()).pathname.startsWith("/login")) throw new Error(`visitatore rimandato al login su ${path}`);
+  if (res.status() >= 400) throw new Error(`visitatore: errore ${res.status()} su ${path}`);
+  const txt = await anon.textContent("body");
+  for (const w of ["Nuovo ordine", "Registra pagamento", "Modifica", "Elimina", "Importa da immagine", "Impostazioni"]) {
+    if (txt.includes(w)) throw new Error(`visitatore vede "${w}" su ${path}`);
+  }
+}
+await anon.goto(BASE + "/ordini/nuovo");
+const loginUrl = new URL(anon.url());
+if (loginUrl.pathname !== "/login" || loginUrl.origin !== new URL(BASE).origin) throw new Error(`redirect di login errato: ${anon.url()}`);
+await anon.screenshot({ path: `${OUT}/11-visitatore-login.png` });
+await anon.goto(BASE + "/strilloni");
+await anon.screenshot({ path: `${OUT}/12-visitatore-strilloni.png`, fullPage: true });
+
+step("permessi: l'amministratore crea un gestore e genera la password");
+const staffUser = "gestore" + code;
+await page.goto(`${BASE}/impostazioni`);
+await page.click("button:has-text('Aggiungi gestore')");
+await page.fill("#u-n", staffUser);
+await page.fill("#u-d", "Gestore di prova");
+await page.fill("#u-p", "Temporanea12345");
+await page.click("button:has-text('Crea utente')");
+await page.waitForSelector(`text=(${staffUser})`);
+const row = page.locator("tr", { hasText: `(${staffUser})` });
+await row.locator("button:has-text('Nuova password')").click();
+await page.click("dialog button:has-text('Genera nuova password')");
+const pw = (await page.locator("dialog p.num").first().textContent()).trim();
+if (pw.length < 12) throw new Error("password generata non mostrata");
+await page.screenshot({ path: `${OUT}/13-nuova-password.png` });
+await page.click("dialog button:has-text('Fatto')");
+
+step("permessi: il gestore crea e modifica ma non elimina");
+const staff = await (await browser.newContext({ locale: "it-IT" })).newPage();
+await staff.goto(`${BASE}/login`);
+await staff.fill("#username", staffUser);
+await staff.fill("#password", "Temporanea12345");
+await staff.click("button:has-text('Apri il registro')");
+await staff.waitForSelector("text=Credenziali non valide");
+await staff.fill("#password", pw);
+await staff.click("button:has-text('Apri il registro')");
+await staff.waitForURL(`${BASE}/`).catch(async (e) => {
+  await staff.screenshot({ path: `${OUT}/err-staff-login.png` });
+  console.log("   password letta:", JSON.stringify(pw), "pagina:", (await staff.textContent("main")).slice(0, 300));
+  throw e;
+});
+await staff.goto(contactUrl);
+await staff.click(`a:has-text('Summers')`);
+await staff.waitForURL(detail("rubrica"));
+const stxt = await staff.textContent("main");
+if (!stxt.includes("Modifica") || !stxt.includes("Archivia")) throw new Error("il gestore non vede Modifica/Archivia");
+if (stxt.includes("Elimina")) throw new Error("il gestore vede Elimina");
+await staff.goto(`${BASE}/impostazioni`);
+if ((await staff.textContent("main")).includes("Utenti e gestori")) throw new Error("il gestore vede la gestione utenti");
 
 step("schermate mobile");
 const m = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, storageState: await ctx.storageState() });

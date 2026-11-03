@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ClipboardPlus } from "lucide-react";
 import { prisma } from "@/lib/db";
+import { viewerFor } from "@/lib/auth/session";
 import { formatCents } from "@/lib/money";
 import { formatDateShort, orderNumber } from "@/lib/labels";
 import { Flourish } from "@/components/ui/bits";
@@ -16,6 +17,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function RecipeDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const user = await viewerFor("ricettario", `/ricettario/${id}`);
   const r = await prisma.recipe.findUnique({
     where: { id },
     select: {
@@ -26,7 +28,7 @@ export default async function RecipeDetail({ params }: { params: Promise<{ id: s
       orderItems: { take: 8, orderBy: { order: { createdAt: "desc" } }, select: { quantity: true, order: { select: { id: true, number: true, customerName: true, createdAt: true } } } },
     },
   });
-  if (!r) notFound();
+  if (!r || (!user && r.archivedAt)) notFound();
   const steps = r.procedure.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
   const tools = r.tools.split(/\r?\n/).map((s) => s.trim()).filter(Boolean);
   const margin = r.suggestedPriceCents != null && r.materialCostCents != null ? r.suggestedPriceCents - r.materialCostCents : null;
@@ -37,12 +39,12 @@ export default async function RecipeDetail({ params }: { params: Promise<{ id: s
         <Link href="/ricettario" className="btn btn-paper btn-sm">
           <ArrowLeft size={15} aria-hidden /> Indice del ricettario
         </Link>
-        <div className="flex flex-wrap gap-2">
+        {user && <div className="flex flex-wrap gap-2">
           <Link href={`/ordini/nuovo?ricetta=${r.id}`} className="btn btn-olive btn-sm">
             <ClipboardPlus size={15} aria-hidden /> Crea ordine con questa lavorazione
           </Link>
-          <RecordActions kind="recipe" id={r.id} archived={!!r.archivedAt} editHref={`/ricettario/${r.id}/modifica`} afterDelete="/ricettario" />
-        </div>
+          <RecordActions kind="recipe" id={r.id} archived={!!r.archivedAt} editHref={`/ricettario/${r.id}/modifica`} afterDelete="/ricettario" isAdmin={user.role === "ADMIN"} />
+        </div>}
       </div>
 
       <article className="paper print-sheet ledger-open grid overflow-hidden rounded-[3px] lg:grid-cols-2">
@@ -114,7 +116,7 @@ export default async function RecipeDetail({ params }: { params: Promise<{ id: s
               <p className="user-text font-fell text-[1.08rem] italic">{r.notes}</p>
             </>
           )}
-          {r.orderItems.length > 0 && (
+          {user && r.orderItems.length > 0 && (
             <div className="no-print mt-7">
               <h2 className="font-display text-lg">Ultime commissioni con questa lavorazione</h2>
               <ul className="mt-1 text-[0.98rem]">

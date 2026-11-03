@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ClipboardPlus } from "lucide-react";
 import { prisma } from "@/lib/db";
+import { viewerFor } from "@/lib/auth/session";
 import { formatCents, paymentState } from "@/lib/money";
 import { formatDateShort, orderNumber } from "@/lib/labels";
 import { Flourish, PaymentLabel, StatusLabel } from "@/components/ui/bits";
@@ -15,8 +16,9 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function ContactDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const user = await viewerFor("rubrica", `/rubrica/${id}`);
   const c = await prisma.contact.findUnique({ where: { id }, include: { orders: { orderBy: { createdAt: "desc" } } } });
-  if (!c) notFound();
+  if (!c || (!user && c.archivedAt)) notFound();
   const due = c.orders.filter((o) => o.status !== "ANNULLATO").reduce((s, o) => s + (o.totalCents - o.paidCents), 0);
   const paid = c.orders.reduce((s, o) => s + o.paidCents, 0);
   return (
@@ -25,12 +27,12 @@ export default async function ContactDetail({ params }: { params: Promise<{ id: 
         <Link href="/rubrica" className="btn btn-paper btn-sm">
           <ArrowLeft size={15} aria-hidden /> Rubrica
         </Link>
-        <div className="flex flex-wrap gap-2">
+        {user && <div className="flex flex-wrap gap-2">
           <Link href={`/ordini/nuovo?contatto=${c.id}`} className="btn btn-olive btn-sm">
             <ClipboardPlus size={15} aria-hidden /> Nuovo ordine per questo cliente
           </Link>
-          <RecordActions kind="contact" id={c.id} archived={!!c.archivedAt} editHref={`/rubrica/${c.id}/modifica`} afterDelete="/rubrica" />
-        </div>
+          <RecordActions kind="contact" id={c.id} archived={!!c.archivedAt} editHref={`/rubrica/${c.id}/modifica`} afterDelete="/rubrica" isAdmin={user.role === "ADMIN"} />
+        </div>}
       </div>
 
       <article className="paper frame print-sheet sheet-in mx-auto max-w-3xl px-6 py-8 sm:px-10">

@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { LogOut } from "lucide-react";
-import { requirePageUser } from "@/lib/auth/session";
+import { KeyRound, LogOut } from "lucide-react";
+import { getCurrentUser, getPublicSectionsCached } from "@/lib/auth/session";
 import { logoutAction } from "@/app/actions/auth";
 import { Emblem } from "@/components/layout/emblem";
 import { DesktopNav, MobileNav, NetworkStatus } from "@/components/layout/nav";
@@ -10,7 +10,8 @@ import { ConfirmProvider } from "@/components/ui/dialog";
 export const dynamic = "force-dynamic";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const user = await requirePageUser();
+  const [user, publicSections] = await Promise.all([getCurrentUser(), getPublicSectionsCached()]);
+  const navUser = user ? { name: user.displayName, role: user.role } : null;
   return (
     <ToastProvider>
       <ConfirmProvider>
@@ -40,20 +41,30 @@ export default async function AppLayout({ children }: { children: React.ReactNod
                 </div>
               </Link>
               <div className="flex items-center gap-3">
-                <div className="hidden text-right lg:block">
-                  <p className="font-fell text-sm italic text-parchment/70">Registro tenuto da</p>
-                  <p className="font-heading text-parchment">{user.displayName}</p>
-                </div>
-                <form action={logoutAction} className="hidden lg:block">
-                  <button className="btn btn-paper btn-sm" title="Esci">
-                    <LogOut size={15} aria-hidden /> Esci
-                  </button>
-                </form>
-                <MobileNav userName={user.displayName} />
+                {user ? (
+                  <>
+                    <div className="hidden text-right lg:block">
+                      <p className="font-fell text-sm italic text-parchment/70">
+                        {user.role === "ADMIN" ? "Amministratore" : "Gestore"}
+                      </p>
+                      <p className="font-heading text-parchment">{user.displayName}</p>
+                    </div>
+                    <form action={logoutAction} className="hidden lg:block">
+                      <button className="btn btn-paper btn-sm" title="Esci">
+                        <LogOut size={15} aria-hidden /> Esci
+                      </button>
+                    </form>
+                  </>
+                ) : (
+                  <Link href="/login" className="btn btn-paper btn-sm hidden lg:inline-flex">
+                    <KeyRound size={15} aria-hidden /> Accesso gestori
+                  </Link>
+                )}
+                <MobileNav user={navUser} publicSections={publicSections} />
               </div>
             </div>
             <div className="mt-3 hidden border-t border-black/30 pt-3 lg:block">
-              <DesktopNav />
+              <DesktopNav user={navUser} publicSections={publicSections} />
             </div>
           </div>
         </header>
@@ -61,7 +72,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           {children}
         </main>
         <footer className="no-print pb-6 text-center font-fell text-sm italic text-parchment/50">
-          Bottega di falegnameria · registro ad uso interno · Wild Lands 1900
+          Bottega di falegnameria · Wild Lands 1900
         </footer>
       </ConfirmProvider>
     </ToastProvider>

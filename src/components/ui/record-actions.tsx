@@ -55,7 +55,9 @@ export function RecordActions({
   editHref,
   afterDelete,
   print = true,
+  isAdmin = false,
 }: {
+  isAdmin?: boolean;
   kind: Kind;
   id: string;
   archived: boolean;
@@ -108,6 +110,7 @@ export function RecordActions({
       >
         {archived ? <ArchiveRestore size={15} aria-hidden /> : <Archive size={15} aria-hidden />} {archived ? "Ripristina" : "Archivia"}
       </button>
+      {isAdmin && (
       <button
         type="button"
         className="btn btn-bordeaux btn-sm"
@@ -126,6 +129,7 @@ export function RecordActions({
       >
         <Trash2 size={15} aria-hidden /> Elimina
       </button>
+      )}
     </div>
   );
 }

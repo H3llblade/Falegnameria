@@ -1,3 +1,4 @@
+import { requirePageUser } from "@/lib/auth/session";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { centsToInput } from "@/lib/money";
@@ -7,6 +8,7 @@ import { PageHeader } from "@/components/ui/bits";
 export const metadata = { title: "Modifica lavorazione" };
 
 export default async function EditRecipePage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePageUser();
   const { id } = await params;
   const [r, categories] = await Promise.all([
     prisma.recipe.findUnique({

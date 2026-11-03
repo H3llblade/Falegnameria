@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { AnnouncementCategory, Prisma } from "@prisma/client";
 import { Megaphone } from "lucide-react";
 import { prisma } from "@/lib/db";
+import { viewerFor } from "@/lib/auth/session";
 import { ANNOUNCEMENT_CATEGORIES, ANNOUNCEMENT_CATEGORY_LABEL } from "@/lib/labels";
 import { EmptyState, PageHeader, tiltFor } from "@/components/ui/bits";
 import { FilterBar } from "@/components/ui/filter-bar";
@@ -11,12 +12,18 @@ export const metadata = { title: "Strilloni" };
 
 export default async function AnnouncementsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const sp = await searchParams;
+  const user = await viewerFor("strilloni", "/strilloni");
   const now = new Date();
   const where: Prisma.AnnouncementWhereInput = { archivedAt: sp.vista === "archivio" ? { not: null } : null };
   if (sp.vista === "bozze") where.status = "BOZZA";
   if (sp.vista === "pubblicati") where.status = "PUBBLICATO";
   if (sp.vista === "scaduti") where.expiresAt = { lt: now };
   if (sp.categoria && ANNOUNCEMENT_CATEGORIES.includes(sp.categoria as AnnouncementCategory)) where.category = sp.categoria as AnnouncementCategory;
+  // I visitatori vedono solo i manifesti pubblicati, non scaduti e non archiviati
+  if (!user) {
+    Object.assign(where, { archivedAt: null, status: "PUBBLICATO", publishedAt: { lte: now } });
+    where.AND = [{ OR: [{ expiresAt: null }, { expiresAt: { gte: now } }] }];
+  }
   if (sp.q?.trim())
     where.OR = [
       { title: { contains: sp.q.trim(), mode: "insensitive" } },
@@ -31,9 +38,11 @@ export default async function AnnouncementsPage({ searchParams }: { searchParams
   return (
     <div>
       <PageHeader title="Strilloni" kicker="Avvisi e manifesti della bottega">
-        <Link href="/strilloni/nuovo" className="btn btn-brass">
-          <Megaphone size={18} aria-hidden /> Nuovo strillone
-        </Link>
+        {user && (
+          <Link href="/strilloni/nuovo" className="btn btn-brass">
+            <Megaphone size={18} aria-hidden /> Nuovo strillone
+          </Link>
+        )}
       </PageHeader>
       <FilterBar
         placeholder="Cerca nei manifesti…"
@@ -43,7 +52,7 @@ export default async function AnnouncementsPage({ searchParams }: { searchParams
             label: "Categoria",
             options: [{ value: "", label: "Tutte" }, ...ANNOUNCEMENT_CATEGORIES.map((c) => ({ value: c, label: ANNOUNCEMENT_CATEGORY_LABEL[c] }))],
           },
-          {
+          ...(!user ? [] : [{
             name: "vista",
             label: "Mostra",
             options: [
@@ -53,16 +62,18 @@ export default async function AnnouncementsPage({ searchParams }: { searchParams
               { value: "scaduti", label: "Scaduti" },
               { value: "archivio", label: "Archivio" },
             ],
-          },
+          }]),
         ]}
       />
       {list.length === 0 ? (
         <EmptyState
           title="Nessun manifesto affisso"
           action={
-            <Link href="/strilloni/nuovo" className="btn btn-ink">
-              Scrivi uno strillone
-            </Link>
+            user ? (
+              <Link href="/strilloni/nuovo" className="btn btn-ink">
+                Scrivi uno strillone
+              </Link>
+            ) : undefined
           }
         >
           La parete degli avvisi attende il primo foglio.

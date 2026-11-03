@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { OrderStatus, Prisma } from "@prisma/client";
 import { ClipboardPlus } from "lucide-react";
 import { prisma } from "@/lib/db";
+import { viewerFor } from "@/lib/auth/session";
 import { formatCents, paymentState } from "@/lib/money";
 import { formatDateShort, ORDER_STATUS_LABEL, ORDER_STATUSES, orderNumber } from "@/lib/labels";
 import { EmptyState, PageHeader, PaymentLabel, Stamp, StatusLabel, StatusStamp, tiltFor } from "@/components/ui/bits";
@@ -20,8 +21,9 @@ const SORTS: Record<string, Prisma.OrderOrderByWithRelationInput[]> = {
 
 export default async function OrdersBoard({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const sp = await searchParams;
+  const user = await viewerFor("ordini", "/ordini");
   const q = sp.q?.trim();
-  const where: Prisma.OrderWhereInput = { archivedAt: sp.archivio === "1" ? { not: null } : null };
+  const where: Prisma.OrderWhereInput = { archivedAt: user && sp.archivio === "1" ? { not: null } : null };
   if (sp.stato && ORDER_STATUSES.includes(sp.stato as OrderStatus)) where.status = sp.stato as OrderStatus;
   else if (sp.stato === "aperti") where.status = { in: ["RICEVUTO", "IN_ATTESA", "IN_LAVORAZIONE", "PRONTO"] };
   const f = prisma.order.fields;
@@ -47,9 +49,11 @@ export default async function OrdersBoard({ searchParams }: { searchParams: Prom
   return (
     <div>
       <PageHeader title="Bacheca ordini" kicker={sp.archivio === "1" ? "Archivio delle commissioni" : "Commissioni affisse"}>
-        <Link href="/ordini/nuovo" className="btn btn-brass">
-          <ClipboardPlus size={18} aria-hidden /> Nuovo ordine
-        </Link>
+        {user && (
+          <Link href="/ordini/nuovo" className="btn btn-brass">
+            <ClipboardPlus size={18} aria-hidden /> Nuovo ordine
+          </Link>
+        )}
       </PageHeader>
 
       <FilterBar
@@ -85,14 +89,18 @@ export default async function OrdersBoard({ searchParams }: { searchParams: Prom
               { value: "importo_asc", label: "Importo minore" },
             ],
           },
-          {
-            name: "archivio",
-            label: "Bacheca",
-            options: [
-              { value: "", label: "Commissioni attive" },
-              { value: "1", label: "Archivio" },
-            ],
-          },
+          ...(user
+            ? [
+                {
+                  name: "archivio",
+                  label: "Bacheca",
+                  options: [
+                    { value: "", label: "Commissioni attive" },
+                    { value: "1", label: "Archivio" },
+                  ],
+                },
+              ]
+            : []),
         ]}
       />
 
@@ -100,9 +108,11 @@ export default async function OrdersBoard({ searchParams }: { searchParams: Prom
         <EmptyState
           title={q || sp.stato || sp.pagamento ? "Nessuna commissione trovata" : "La bacheca è vuota"}
           action={
-            <Link href="/ordini/nuovo" className="btn btn-ink">
-              Affiggi la prima commissione
-            </Link>
+            user ? (
+              <Link href="/ordini/nuovo" className="btn btn-ink">
+                Affiggi la prima commissione
+              </Link>
+            ) : undefined
           }
         >
           {q || sp.stato || sp.pagamento ? "Provate a modificare i criteri di ricerca." : "Nessun foglio appeso al chiodo, per ora."}

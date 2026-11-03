@@ -1,3 +1,4 @@
+import { requirePageUser } from "@/lib/auth/session";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { toDateInput } from "@/lib/labels";
@@ -7,6 +8,7 @@ import { PageHeader } from "@/components/ui/bits";
 export const metadata = { title: "Modifica strillone" };
 
 export default async function EditAnnouncementPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePageUser();
   const { id } = await params;
   const a = await prisma.announcement.findUnique({ where: { id } });
   if (!a) notFound();

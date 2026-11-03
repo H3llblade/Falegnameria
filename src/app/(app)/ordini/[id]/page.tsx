@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { viewerFor } from "@/lib/auth/session";
 import { formatCents, paymentState } from "@/lib/money";
 import { formatDate, formatDateShort, formatDateTime, orderNumber } from "@/lib/labels";
 import { scaleMaterials, sumMaterials, type ScaledMaterial } from "@/lib/quantity";
@@ -18,6 +19,7 @@ type Snapshot = { name: string; quantity: string; unit: string }[];
 
 export default async function OrderDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const user = await viewerFor("ordini", `/ordini/${id}`);
   const order = await prisma.order.findUnique({
     where: { id },
     include: {
@@ -27,7 +29,7 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
     },
   });
   if (!order) notFound();
-  const history = await prisma.auditLog.findMany({
+  const history = !user ? [] : await prisma.auditLog.findMany({
     where: { OR: [{ entity: "Order", entityId: id }, { entity: "Payment", entityId: { in: order.payments.map((p) => p.id) } }] },
     orderBy: { createdAt: "desc" },
     take: 30,
@@ -186,10 +188,11 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
       </article>
 
       <aside className="no-print space-y-6">
-        <OrderActions id={order.id} number={order.number} status={order.status} archived={!!order.archivedAt} />
+        {user && <OrderActions id={order.id} number={order.number} status={order.status} archived={!!order.archivedAt} isAdmin={user.role === "ADMIN"} />}
         <PaymentsPanel
           orderId={order.id}
           cancelled={order.status === "ANNULLATO"}
+          readOnly={!user}
           residualCents={residual}
           payments={order.payments.map((p) => ({
             id: p.id,
@@ -197,12 +200,13 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
             method: p.method,
             note: p.note,
             paidAt: p.paidAt.toISOString(),
-            createdBy: p.createdBy?.displayName ?? null,
+            createdBy: user ? (p.createdBy?.displayName ?? null) : null,
             voidedAt: p.voidedAt?.toISOString() ?? null,
-            voidedBy: p.voidedBy?.displayName ?? null,
-            voidReason: p.voidReason,
+            voidedBy: user ? (p.voidedBy?.displayName ?? null) : null,
+            voidReason: user ? p.voidReason : null,
           }))}
         />
+        {user && (
         <section className="paper px-5 py-5">
           <h2 className="font-display text-lg">Cronologia amministrativa</h2>
           <ul className="mt-2 space-y-1.5 text-[0.95rem]">
@@ -218,6 +222,7 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
           </ul>
           <p className="mt-2 font-fell text-sm italic text-ink-soft">Ultima modifica: {formatDateShort(order.updatedAt)}</p>
         </section>
+        )}
       </aside>
     </div>
   );

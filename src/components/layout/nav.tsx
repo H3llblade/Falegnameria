@@ -3,18 +3,25 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { BookOpen, ClipboardList, Contact, LogOut, Megaphone, Menu, NotebookPen, Plus, Settings, X } from "lucide-react";
+import { BookOpen, ClipboardList, Contact, KeyRound, LogOut, Megaphone, Menu, NotebookPen, Plus, Settings, X } from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
 
+export type NavUser = { name: string; role: "ADMIN" | "STAFF" } | null;
+
+/** section: sezione pubblica che rende visibile la voce ai visitatori; null = solo gestori */
 export const NAV = [
-  { href: "/", label: "Registro generale", short: "Registro", icon: NotebookPen },
-  { href: "/ordini", label: "Bacheca ordini", short: "Ordini", icon: ClipboardList },
-  { href: "/ordini/nuovo", label: "Nuovo ordine", short: "Nuovo", icon: Plus },
-  { href: "/strilloni", label: "Strilloni", short: "Strilloni", icon: Megaphone },
-  { href: "/ricettario", label: "Ricettario", short: "Ricettario", icon: BookOpen },
-  { href: "/rubrica", label: "Rubrica contatti", short: "Rubrica", icon: Contact },
-  { href: "/impostazioni", label: "Impostazioni", short: "Impostazioni", icon: Settings },
+  { href: "/", label: "Registro generale", short: "Registro", icon: NotebookPen, section: "registro" },
+  { href: "/ordini", label: "Bacheca ordini", short: "Ordini", icon: ClipboardList, section: "ordini" },
+  { href: "/ordini/nuovo", label: "Nuovo ordine", short: "Nuovo", icon: Plus, section: null },
+  { href: "/strilloni", label: "Strilloni", short: "Strilloni", icon: Megaphone, section: "strilloni" },
+  { href: "/ricettario", label: "Ricettario", short: "Ricettario", icon: BookOpen, section: "ricettario" },
+  { href: "/rubrica", label: "Rubrica contatti", short: "Rubrica", icon: Contact, section: "rubrica" },
+  { href: "/impostazioni", label: "Impostazioni", short: "Impostazioni", icon: Settings, section: null },
 ];
+
+function visibleNav(user: NavUser, publicSections: string[]) {
+  return NAV.filter((n) => (user ? true : n.section !== null && publicSections.includes(n.section)));
+}
 
 function isActive(path: string, href: string) {
   if (href === "/") return path === "/";
@@ -22,12 +29,12 @@ function isActive(path: string, href: string) {
   return path.startsWith(href);
 }
 
-export function DesktopNav() {
+export function DesktopNav({ user, publicSections }: { user: NavUser; publicSections: string[] }) {
   const path = usePathname();
   return (
     <nav aria-label="Navigazione principale" className="no-print hidden lg:block">
       <ul className="flex flex-wrap justify-center gap-2">
-        {NAV.map(({ href, short, icon: Icon }) => {
+        {visibleNav(user, publicSections).map(({ href, short, icon: Icon }) => {
           const active = isActive(path, href);
           return (
             <li key={href}>
@@ -49,7 +56,7 @@ export function DesktopNav() {
   );
 }
 
-export function MobileNav({ userName }: { userName: string }) {
+export function MobileNav({ user, publicSections }: { user: NavUser; publicSections: string[] }) {
   const path = usePathname();
   const [open, setOpen] = useState(false);
   useEffect(() => setOpen(false), [path]);
@@ -79,7 +86,7 @@ export function MobileNav({ userName }: { userName: string }) {
               </button>
             </div>
             <ul className="flex flex-col gap-1.5">
-              {NAV.map(({ href, label, icon: Icon }) => {
+              {visibleNav(user, publicSections).map(({ href, label, icon: Icon }) => {
                 const active = isActive(path, href);
                 return (
                   <li key={href}>
@@ -98,12 +105,22 @@ export function MobileNav({ userName }: { userName: string }) {
               })}
             </ul>
             <div className="mt-auto border-t border-parchment/20 pt-4 text-parchment/80">
-              <p className="mb-2 font-fell italic">Accesso: {userName}</p>
-              <form action={logoutAction}>
-                <button className="btn btn-paper btn-sm w-full">
-                  <LogOut size={16} aria-hidden /> Esci
-                </button>
-              </form>
+              {user ? (
+                <>
+                  <p className="mb-2 font-fell italic">
+                    {user.role === "ADMIN" ? "Amministratore" : "Gestore"}: {user.name}
+                  </p>
+                  <form action={logoutAction}>
+                    <button className="btn btn-paper btn-sm w-full">
+                      <LogOut size={16} aria-hidden /> Esci
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <Link href="/login" className="btn btn-paper btn-sm w-full">
+                  <KeyRound size={16} aria-hidden /> Accesso gestori
+                </Link>
+              )}
             </div>
           </nav>
         </div>

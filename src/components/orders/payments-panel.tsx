@@ -30,7 +30,9 @@ export function PaymentsPanel({
   payments,
   residualCents,
   cancelled,
+  readOnly = false,
 }: {
+  readOnly?: boolean;
   orderId: string;
   payments: PaymentRow[];
   residualCents: number;
@@ -95,11 +97,15 @@ export function PaymentsPanel({
               {[p.note, p.method, p.createdBy && `reg. ${p.createdBy}`].filter(Boolean).join(" · ") || "—"}
             </p>
             {p.voidedAt ? (
+              readOnly ? (
+                <p className="font-fell text-sm italic text-bordeaux">Annullato</p>
+              ) : (
               <p className="font-fell text-sm italic text-bordeaux">
                 Annullato il {formatDateShort(p.voidedAt)}
                 {p.voidedBy ? ` da ${p.voidedBy}` : ""}: {p.voidReason}
               </p>
-            ) : (
+              )
+            ) : readOnly ? null : (
               <div className="mt-1 flex gap-1">
                 <button type="button" className="btn btn-ghost btn-sm !min-h-0 !px-2 !py-0.5 text-sm" onClick={() => setEditing(p)}>
                   <PencilLine size={14} aria-hidden /> Correggi
@@ -118,7 +124,7 @@ export function PaymentsPanel({
           <span>Residuo dovuto</span>
           <span className={`num ${residualCents > 0 ? "text-bordeaux" : "text-olive"}`}>{formatCents(residualCents)}</span>
         </p>
-        {cancelled ? (
+        {readOnly ? null : cancelled ? (
           <p className="mt-2 font-fell italic text-ink-soft">Ordine annullato: non si registrano nuovi pagamenti.</p>
         ) : residualCents <= 0 ? (
           <p className="mt-2 font-fell italic text-olive">Commissione interamente saldata.</p>

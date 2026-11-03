@@ -4,6 +4,16 @@ Gestionale web per la bottega di falegnameria del Roleplay *Wild Lands 1900*: or
 
 **Produzione:** https://falegnameria.devicloud.me · **Deploy:** [docs/DEPLOY.md](docs/DEPLOY.md)
 
+## Accesso e ruoli
+
+| Chi | Cosa può fare |
+|---|---|
+| **Visitatore** (nessun accesso) | Consulta in sola lettura le sezioni rese pubbliche dall'amministratore (default: tutte). Non vede bozze né elementi archiviati. Non esiste registrazione. |
+| **Gestore** | Crea e modifica ordini, pagamenti, contatti, ricette e strilloni; può archiviare e annullare, **non eliminare**. |
+| **Amministratore** | Tutto, comprese le eliminazioni, la gestione utenti (nuovi gestori, nuova password, ruoli, disattivazione) e la visibilità pubblica. |
+
+Le password non sono mai visibili, nemmeno all'amministratore: nel database c'è solo un hash scrypt. Per consegnare un accesso si usa *Impostazioni → Nuova password*, che mostra la password generata una sola volta.
+
 ## Tecnologie
 
 Next.js 15 (App Router) · TypeScript · Tailwind CSS 4 · PostgreSQL 16 · Prisma 6 · React Hook Form + Zod · Tesseract.js (OCR nel browser) · pdf-lib · PM2 · Nginx · Let's Encrypt · GitHub Actions.
@@ -19,7 +29,7 @@ Next.js 15 (App Router) · TypeScript · Tailwind CSS 4 · PostgreSQL 16 · Pris
 | Strilloni | `/strilloni` | Manifesti con emoji, categorie, priorità, fissati in alto, bozze, scadenze, anteprima, stampa |
 | Ricettario | `/ricettario` | Schede lavorazione, materiali per unità, calcolo per N unità, immagine, duplica, collega a ordine |
 | Rubrica | `/rubrica` | Registro alfabetico (cognome, nome, collazione italiana), duplicati, CSV, **Importa da immagine** |
-| Impostazioni | `/impostazioni` | Password, sessioni, categorie, utenti, registro di controllo |
+| Impostazioni | `/impostazioni` | Password, sessioni, categorie, visibilità pubblica, utenti e gestori, registro di controllo |
 
 ## Sviluppo in GitHub Codespaces
 

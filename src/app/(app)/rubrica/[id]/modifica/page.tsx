@@ -1,3 +1,4 @@
+import { requirePageUser } from "@/lib/auth/session";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { ContactForm } from "@/components/contacts/contact-form";
@@ -6,6 +7,7 @@ import { PageHeader } from "@/components/ui/bits";
 export const metadata = { title: "Modifica contatto" };
 
 export default async function EditContactPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePageUser();
   const { id } = await params;
   const c = await prisma.contact.findUnique({ where: { id } });
   if (!c) notFound();

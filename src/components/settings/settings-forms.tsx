@@ -4,13 +4,21 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, KeyRound, LogOut, Pencil, Plus, Trash2, UserPlus, X } from "lucide-react";
-import { changePasswordAction, createUserAction, logoutEverywhereAction, setUserActiveAction } from "@/app/actions/auth";
+import { Check, Copy, Eye, KeyRound, LogOut, Pencil, Plus, Trash2, UserPlus, X } from "lucide-react";
+import {
+  changePasswordAction,
+  createUserAction,
+  logoutEverywhereAction,
+  resetUserPasswordAction,
+  setPublicSectionsAction,
+  setUserActiveAction,
+  updateUserAction,
+} from "@/app/actions/auth";
 import { createCategoryAction, deleteCategoryAction, renameCategoryAction } from "@/app/actions/recipes";
 import { passwordChangeSchema, userCreateSchema } from "@/lib/validation/schemas";
 import { formatDateTime } from "@/lib/labels";
 import { applyServerErrors, FieldShell, Input, Select } from "@/components/ui/form";
-import { useConfirm } from "@/components/ui/dialog";
+import { Modal, useConfirm } from "@/components/ui/dialog";
 import { useActionToast } from "@/components/ui/toast";
 
 export function PasswordForm() {
@@ -65,7 +73,7 @@ export function SessionsBox({ count }: { count: number }) {
   );
 }
 
-export function CategoriesManager({ categories }: { categories: { id: string; name: string; count: number }[] }) {
+export function CategoriesManager({ categories, isAdmin }: { categories: { id: string; name: string; count: number }[]; isAdmin: boolean }) {
   const router = useRouter();
   const toast = useActionToast();
   const confirm = useConfirm();
@@ -106,6 +114,7 @@ export function CategoriesManager({ categories }: { categories: { id: string; na
                 <button type="button" className="btn btn-ghost btn-sm !px-1.5" aria-label={`Rinomina ${c.name}`} onClick={() => setEditing({ id: c.id, name: c.name })}>
                   <Pencil size={14} />
                 </button>
+                {isAdmin && (
                 <button
                   type="button"
                   className="btn btn-ghost btn-sm !px-1.5 text-bordeaux"
@@ -122,6 +131,7 @@ export function CategoriesManager({ categories }: { categories: { id: string; na
                 >
                   <Trash2 size={14} />
                 </button>
+                )}
               </>
             )}
           </li>
@@ -143,17 +153,86 @@ export function CategoriesManager({ categories }: { categories: { id: string; na
   );
 }
 
+export function PublicSectionsForm({ sections, labels, initial }: { sections: string[]; labels: Record<string, string>; initial: string[] }) {
+  const router = useRouter();
+  const toast = useActionToast();
+  const [sel, setSel] = useState<string[]>(initial);
+  const [pending, start] = useTransition();
+  return (
+    <div className="mt-3">
+      <p className="font-fell italic text-ink-soft">
+        Le sezioni spuntate sono consultabili da chiunque, senza accesso e in sola lettura (niente bozze né elementi archiviati). Non esiste
+        alcuna registrazione pubblica: solo l&apos;amministratore crea gli account dei gestori.
+      </p>
+      <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+        {sections.map((s) => (
+          <li key={s}>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="h-5 w-5 accent-[#596044]"
+                checked={sel.includes(s)}
+                onChange={(e) => setSel((cur) => (e.target.checked ? [...cur, s] : cur.filter((x) => x !== s)))}
+              />
+              <span>{labels[s]}</span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        className="btn btn-ink btn-sm mt-3"
+        disabled={pending}
+        onClick={() =>
+          start(async () => {
+            toast(await setPublicSectionsAction(sel));
+            router.refresh();
+          })
+        }
+      >
+        <Eye size={15} aria-hidden /> Salva visibilità
+      </button>
+    </div>
+  );
+}
+
 type UserRow = { id: string; username: string; displayName: string; role: "ADMIN" | "STAFF"; active: boolean; lastLoginAt: string | null };
+
+const ROLE_LABEL = { ADMIN: "Amministratore", STAFF: "Gestore" } as const;
 
 export function UsersManager({ users, meId }: { users: UserRow[]; meId: string }) {
   const router = useRouter();
   const toast = useActionToast();
+  const confirm = useConfirm();
   const [show, setShow] = useState(false);
+  const [editing, setEditing] = useState<UserRow | null>(null);
+  const [revealed, setRevealed] = useState<{ user: UserRow; password: string } | null>(null);
+  const [copied, setCopied] = useState(false);
   const form = useForm({ resolver: zodResolver(userCreateSchema), defaultValues: { username: "", displayName: "", password: "", role: "STAFF" as const } });
   const e = form.formState.errors;
+
+  const resetPassword = async (u: UserRow) => {
+    const r = await confirm({
+      title: `Nuova password per ${u.displayName}?`,
+      body: "Verrà generata una password nuova, mostrata una sola volta. Quella attuale smetterà di funzionare e le sessioni aperte dell'utente verranno chiuse.",
+      confirmLabel: "Genera nuova password",
+    });
+    if (!r.confirmed) return;
+    const res = await resetUserPasswordAction(u.id);
+    toast(res);
+    if (res.ok && res.data) {
+      setCopied(false);
+      setRevealed({ user: u, password: res.data.password });
+    }
+  };
+
   return (
     <div className="mt-3">
-      <div className="overflow-x-auto">
+      <p className="font-fell italic text-ink-soft">
+        Le password non sono mai visibili: nel registro ne è conservata solo un&apos;impronta cifrata, da cui non si può risalire all&apos;originale.
+        Per consegnare l&apos;accesso a un gestore usate «Nuova password»: la vedrete una sola volta, da comunicargli.
+      </p>
+      <div className="mt-3 overflow-x-auto">
         <table className="ledger">
           <thead>
             <tr>
@@ -161,40 +240,51 @@ export function UsersManager({ users, meId }: { users: UserRow[]; meId: string }
               <th>Ruolo</th>
               <th>Ultimo accesso</th>
               <th>Stato</th>
+              <th>
+                <span className="sr-only">Azioni</span>
+              </th>
             </tr>
           </thead>
           <tbody>
             {users.map((u) => (
-              <tr key={u.id}>
+              <tr key={u.id} className={u.active ? "" : "opacity-60"}>
                 <td>
                   {u.displayName} <span className="num text-sm text-ink-soft">({u.username})</span>
                 </td>
-                <td>{u.role === "ADMIN" ? "Amministratore" : "Collaboratore"}</td>
-                <td className="num text-sm">{formatDateTime(u.lastLoginAt)}</td>
+                <td>{ROLE_LABEL[u.role]}</td>
+                <td className="num text-sm whitespace-nowrap">{formatDateTime(u.lastLoginAt)}</td>
+                <td>{u.active ? "Attivo" : "Disattivato"}</td>
                 <td>
-                  {u.id === meId ? (
-                    <span className="font-fell italic">voi</span>
-                  ) : (
-                    <button
-                      type="button"
-                      className={`btn btn-sm ${u.active ? "btn-paper" : "btn-olive"}`}
-                      onClick={async () => {
-                        toast(await setUserActiveAction(u.id, !u.active));
-                        router.refresh();
-                      }}
-                    >
-                      {u.active ? "Disattiva" : "Riattiva"}
+                  <div className="flex flex-wrap justify-end gap-1">
+                    <button type="button" className="btn btn-paper btn-sm" onClick={() => setEditing(u)}>
+                      <Pencil size={14} aria-hidden /> Modifica
                     </button>
-                  )}
+                    <button type="button" className="btn btn-paper btn-sm" onClick={() => resetPassword(u)}>
+                      <KeyRound size={14} aria-hidden /> Nuova password
+                    </button>
+                    {u.id !== meId && (
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${u.active ? "btn-paper" : "btn-olive"}`}
+                        onClick={async () => {
+                          toast(await setUserActiveAction(u.id, !u.active));
+                          router.refresh();
+                        }}
+                      >
+                        {u.active ? "Disattiva" : "Riattiva"}
+                      </button>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
       {!show ? (
-        <button type="button" className="btn btn-paper btn-sm mt-3" onClick={() => setShow(true)}>
-          <UserPlus size={15} aria-hidden /> Aggiungi utente
+        <button type="button" className="btn btn-brass btn-sm mt-3" onClick={() => setShow(true)}>
+          <UserPlus size={15} aria-hidden /> Aggiungi gestore
         </button>
       ) : (
         <form
@@ -210,19 +300,19 @@ export function UsersManager({ users, meId }: { users: UserRow[]; meId: string }
             } else applyServerErrors(r.fieldErrors, form.setError);
           })}
         >
-          <FieldShell label="Nome utente" htmlFor="u-n" error={e.username}>
+          <FieldShell label="Nome utente (per l'accesso)" htmlFor="u-n" error={e.username}>
             <Input id="u-n" autoComplete="off" invalid={!!e.username} {...form.register("username")} />
           </FieldShell>
           <FieldShell label="Nome visualizzato" htmlFor="u-d" error={e.displayName}>
             <Input id="u-d" invalid={!!e.displayName} {...form.register("displayName")} />
           </FieldShell>
-          <FieldShell label="Password iniziale" htmlFor="u-p" error={e.password}>
-            <Input id="u-p" type="password" autoComplete="new-password" invalid={!!e.password} {...form.register("password")} />
+          <FieldShell label="Password iniziale" htmlFor="u-p" error={e.password} hint="Almeno 10 caratteri, lettere e numeri">
+            <Input id="u-p" type="text" autoComplete="new-password" invalid={!!e.password} {...form.register("password")} />
           </FieldShell>
           <FieldShell label="Ruolo" htmlFor="u-r">
             <Select id="u-r" {...form.register("role")}>
-              <option value="STAFF">Collaboratore</option>
-              <option value="ADMIN">Amministratore</option>
+              <option value="STAFF">Gestore — crea e modifica, non elimina</option>
+              <option value="ADMIN">Amministratore — tutto, comprese eliminazioni e utenti</option>
             </Select>
           </FieldShell>
           <div className="flex gap-2 sm:col-span-2">
@@ -235,6 +325,85 @@ export function UsersManager({ users, meId }: { users: UserRow[]; meId: string }
           </div>
         </form>
       )}
+
+      <Modal open={!!editing} onClose={() => setEditing(null)} title="Modifica utente">
+        {editing && <EditUserForm user={editing} isMe={editing.id === meId} onDone={() => setEditing(null)} />}
+      </Modal>
+
+      <Modal open={!!revealed} onClose={() => setRevealed(null)} title="Nuova password">
+        {revealed && (
+          <div className="space-y-4">
+            <p>
+              Password per <strong>{revealed.user.displayName}</strong> (utente <span className="num">{revealed.user.username}</span>):
+            </p>
+            <p className="num select-all break-all border-2 border-dashed border-ink/50 bg-parchment-light px-4 py-3 text-center text-xl">{revealed.password}</p>
+            <p className="font-fell italic text-bordeaux">
+              Copiatela ora e comunicatela al gestore: chiusa questa finestra non sarà più possibile rivederla.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                className="btn btn-paper"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(revealed.password);
+                    setCopied(true);
+                  } catch {
+                    setCopied(false);
+                  }
+                }}
+              >
+                <Copy size={15} aria-hidden /> {copied ? "Copiata" : "Copia"}
+              </button>
+              <button type="button" className="btn btn-ink" onClick={() => setRevealed(null)}>
+                Fatto
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
     </div>
+  );
+}
+
+function EditUserForm({ user, isMe, onDone }: { user: UserRow; isMe: boolean; onDone: () => void }) {
+  const router = useRouter();
+  const toast = useActionToast();
+  const [displayName, setDisplayName] = useState(user.displayName);
+  const [role, setRole] = useState<"ADMIN" | "STAFF">(user.role);
+  const [pending, start] = useTransition();
+  return (
+    <form
+      className="space-y-3"
+      onSubmit={(e) => {
+        e.preventDefault();
+        start(async () => {
+          const r = await updateUserAction(user.id, { displayName, role });
+          toast(r);
+          if (r.ok) {
+            router.refresh();
+            onDone();
+          }
+        });
+      }}
+    >
+      <FieldShell label="Nome visualizzato" htmlFor="eu-d">
+        <Input id="eu-d" value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={80} />
+      </FieldShell>
+      <FieldShell label="Ruolo" htmlFor="eu-r" hint={isMe ? "Non potete togliere a voi stessi il ruolo di amministratore" : undefined}>
+        <Select id="eu-r" value={role} disabled={isMe} onChange={(e) => setRole(e.target.value as "ADMIN" | "STAFF")}>
+          <option value="STAFF">Gestore</option>
+          <option value="ADMIN">Amministratore</option>
+        </Select>
+      </FieldShell>
+      <div className="flex justify-end gap-2">
+        <button type="button" className="btn btn-paper" onClick={onDone}>
+          Annulla
+        </button>
+        <button className="btn btn-ink" disabled={pending}>
+          Salva
+        </button>
+      </div>
+    </form>
   );
 }

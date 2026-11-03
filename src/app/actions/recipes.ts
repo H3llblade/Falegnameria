@@ -60,7 +60,7 @@ export async function archiveRecipeAction(id: string, archived: boolean): Promis
 
 export async function deleteRecipeAction(id: string): Promise<ActionResult> {
   return runAction(async () => {
-    const me = await requireUser();
+    const me = await requireUser("ADMIN");
     await svc.deleteRecipe(prisma, idSchema.parse(id), me.id);
     refresh();
   }, "Lavorazione eliminata (gli ordini conservano i propri dati)");
@@ -84,7 +84,7 @@ export async function renameCategoryAction(id: string, raw: unknown): Promise<Ac
 
 export async function deleteCategoryAction(id: string): Promise<ActionResult> {
   return runAction(async () => {
-    const me = await requireUser();
+    const me = await requireUser("ADMIN");
     await svc.deleteCategory(prisma, idSchema.parse(id), me.id);
     refresh();
   }, "Categoria eliminata");

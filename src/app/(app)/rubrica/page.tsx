@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { FileDown, UserPlus } from "lucide-react";
 import { prisma } from "@/lib/db";
+import { viewerFor } from "@/lib/auth/session";
 import { indexLetter } from "@/lib/contacts";
 import { listContacts } from "@/lib/services/contacts";
 import { EmptyState, PageHeader } from "@/components/ui/bits";
@@ -13,10 +14,11 @@ const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#".split("");
 
 export default async function ContactsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const sp = await searchParams;
+  const user = await viewerFor("rubrica", "/rubrica");
   const contacts = await listContacts(prisma, {
     q: sp.q,
     city: sp.citta,
-    archived: sp.archivio === "1",
+    archived: !!user && sp.archivio === "1",
     withOrders: sp.ordini === "1",
   });
   const cities = await prisma.contact.findMany({ where: { city: { not: null } }, distinct: ["city"], select: { city: true }, orderBy: { city: "asc" } });
@@ -31,13 +33,17 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
   return (
     <div>
       <PageHeader title="Rubrica contatti" kicker="Registro alfabetico di clienti e collaboratori">
-        <Link href="/rubrica/nuovo" className="btn btn-brass">
-          <UserPlus size={18} aria-hidden /> Nuovo contatto
-        </Link>
-        <ImportDialog />
-        <a href={`/api/rubrica/esporta${exportQs ? `?${exportQs}` : ""}`} className="btn btn-paper">
-          <FileDown size={18} aria-hidden /> Esporta CSV
-        </a>
+        {user && (
+          <>
+            <Link href="/rubrica/nuovo" className="btn btn-brass">
+              <UserPlus size={18} aria-hidden /> Nuovo contatto
+            </Link>
+            <ImportDialog />
+            <a href={`/api/rubrica/esporta${exportQs ? `?${exportQs}` : ""}`} className="btn btn-paper">
+              <FileDown size={18} aria-hidden /> Esporta CSV
+            </a>
+          </>
+        )}
       </PageHeader>
 
       <FilterBar
@@ -45,7 +51,7 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
         filters={[
           { name: "citta", label: "Città", options: [{ value: "", label: "Tutte" }, ...cities.map((c) => ({ value: c.city!, label: c.city! }))] },
           { name: "ordini", label: "Clienti", options: [{ value: "", label: "Tutti i contatti" }, { value: "1", label: "Con ordini" }] },
-          { name: "archivio", label: "Mostra", options: [{ value: "", label: "Attivi" }, { value: "1", label: "Archiviati" }] },
+          ...(user ? [{ name: "archivio", label: "Mostra", options: [{ value: "", label: "Attivi" }, { value: "1", label: "Archiviati" }] }] : []),
         ]}
       />
 
@@ -53,9 +59,11 @@ export default async function ContactsPage({ searchParams }: { searchParams: Pro
         <EmptyState
           title={sp.q ? "Nessun nome corrisponde" : "La rubrica è vuota"}
           action={
-            <Link href="/rubrica/nuovo" className="btn btn-ink">
-              Registra un contatto
-            </Link>
+            user ? (
+              <Link href="/rubrica/nuovo" className="btn btn-ink">
+                Registra un contatto
+              </Link>
+            ) : undefined
           }
         >
           {sp.q ? "Provate con un altro nome o codice missiva." : "Aggiungete i primi clienti, oppure importateli da uno screenshot."}

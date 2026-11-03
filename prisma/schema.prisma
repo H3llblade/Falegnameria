@@ -255,3 +255,10 @@ model AuditLog {
   @@index([entity, entityId])
   @@index([createdAt])
 }
+
+/// Impostazioni dell'applicazione modificabili dall'amministratore (es. sezioni pubbliche)
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}

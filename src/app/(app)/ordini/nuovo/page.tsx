@@ -1,3 +1,4 @@
+import { requirePageUser } from "@/lib/auth/session";
 import { prisma } from "@/lib/db";
 import { orderFormOptions } from "@/lib/services/options";
 import { OrderForm } from "@/components/orders/order-form";
@@ -6,6 +7,7 @@ import { PageHeader } from "@/components/ui/bits";
 export const metadata = { title: "Nuovo ordine" };
 
 export default async function NewOrderPage({ searchParams }: { searchParams: Promise<{ contatto?: string; ricetta?: string }> }) {
+  await requirePageUser();
   const sp = await searchParams;
   const { contacts, recipes } = await orderFormOptions(prisma);
   const nextNumber = await prisma.$queryRaw<{ n: bigint }[]>`SELECT CASE WHEN is_called THEN last_value + 1 ELSE last_value END AS n FROM "Order_number_seq"`;

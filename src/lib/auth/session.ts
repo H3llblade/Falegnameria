@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { cache } from "react";
 import type { Role } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { getPublicSections, type Section } from "@/lib/services/settings";
 
 const SESSION_DAYS = Number(process.env.SESSION_DAYS || 7);
 
@@ -88,6 +89,27 @@ export async function requireUser(role?: Role): Promise<SessionUser> {
   if (!user) throw new AuthError("Sessione scaduta: effettua di nuovo l'accesso");
   if (role === "ADMIN" && user.role !== "ADMIN") throw new AuthError("Operazione riservata all'amministratore");
   return user;
+}
+
+/** Sezioni pubbliche, una sola lettura per richiesta */
+export const getPublicSectionsCached = cache(() => getPublicSections(prisma));
+
+/**
+ * Per le pagine di consultazione: restituisce l'utente (gestore/admin) oppure null se è
+ * un visitatore e la sezione è pubblica. Se la sezione non è pubblica rimanda al login.
+ */
+export async function viewerFor(section: Section, nextPath: string): Promise<SessionUser | null> {
+  const user = await getCurrentUser();
+  if (user) return user;
+  const pub = await getPublicSectionsCached();
+  if (!pub.includes(section)) redirect(`/login?next=${encodeURIComponent(nextPath)}`);
+  return null;
+}
+
+/** Per le API in sola lettura: consentito a utenti autenticati o se la sezione è pubblica */
+export async function canRead(section: Section): Promise<boolean> {
+  if (await getCurrentUser()) return true;
+  return (await getPublicSectionsCached()).includes(section);
 }
 
 export async function purgeExpiredSessions() {

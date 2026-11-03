@@ -31,7 +31,7 @@ export async function updateContactAction(id: string, raw: unknown): Promise<Act
 
 export async function deleteContactAction(id: string): Promise<ActionResult> {
   return runAction(async () => {
-    const me = await requireUser();
+    const me = await requireUser("ADMIN");
     await svc.deleteContact(prisma, idSchema.parse(id), me.id);
     refresh();
   }, "Contatto eliminato (gli ordini storici sono conservati)");

@@ -2,7 +2,8 @@ import { prisma } from "@/lib/db";
 import { requirePageUser } from "@/lib/auth/session";
 import { formatDateTime } from "@/lib/labels";
 import { PageHeader } from "@/components/ui/bits";
-import { CategoriesManager, PasswordForm, SessionsBox, UsersManager } from "@/components/settings/settings-forms";
+import { CategoriesManager, PasswordForm, PublicSectionsForm, SessionsBox, UsersManager } from "@/components/settings/settings-forms";
+import { getPublicSections, SECTION_LABEL, SECTIONS } from "@/lib/services/settings";
 
 export const metadata = { title: "Impostazioni" };
 
@@ -22,6 +23,8 @@ const ACTION_LABEL: Record<string, string> = {
   password_change: "cambio password",
   logout_all: "chiusura sessioni",
   activate: "riattivazione",
+  password_reset: "nuova password",
+  bootstrap: "creazione iniziale",
   deactivate: "disattivazione",
 };
 
@@ -31,6 +34,7 @@ const ENTITY_LABEL: Record<string, string> = {
   Contact: "Contatto",
   Recipe: "Ricetta",
   Category: "Categoria",
+  Setting: "Impostazione",
   Announcement: "Strillone",
   User: "Utente",
 };
@@ -87,12 +91,19 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
       <section id="categorie" className="paper scroll-mt-6 px-6 py-6">
         <h2 className="font-display text-xl">Categorie del ricettario</h2>
-        <CategoriesManager categories={categories.map((c) => ({ id: c.id, name: c.name, count: c._count.recipes }))} />
+        <CategoriesManager isAdmin={me.role === "ADMIN"} categories={categories.map((c) => ({ id: c.id, name: c.name, count: c._count.recipes }))} />
       </section>
 
       {me.role === "ADMIN" && (
         <section className="paper px-6 py-6">
-          <h2 className="font-display text-xl">Utenti</h2>
+          <h2 className="font-display text-xl">Visibilità pubblica</h2>
+          <PublicSectionsForm sections={[...SECTIONS]} labels={SECTION_LABEL} initial={await getPublicSections(prisma)} />
+        </section>
+      )}
+
+      {me.role === "ADMIN" && (
+        <section className="paper px-6 py-6">
+          <h2 className="font-display text-xl">Utenti e gestori</h2>
           <UsersManager meId={me.id} users={users.map((u) => ({ ...u, lastLoginAt: u.lastLoginAt?.toISOString() ?? null }))} />
         </section>
       )}

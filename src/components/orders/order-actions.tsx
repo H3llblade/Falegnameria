@@ -10,7 +10,7 @@ import { ARCHIVABLE_STATUSES, ORDER_STATUS_LABEL, ORDER_STATUSES } from "@/lib/l
 import { useConfirm } from "@/components/ui/dialog";
 import { useActionToast } from "@/components/ui/toast";
 
-export function OrderActions({ id, number, status, archived }: { id: string; number: number; status: OrderStatus; archived: boolean }) {
+export function OrderActions({ id, number, status, archived, isAdmin }: { id: string; number: number; status: OrderStatus; archived: boolean; isAdmin: boolean }) {
   const router = useRouter();
   const toast = useActionToast();
   const confirm = useConfirm();
@@ -89,7 +89,7 @@ export function OrderActions({ id, number, status, archived }: { id: string; num
             {archived ? <ArchiveRestore size={15} aria-hidden /> : <Archive size={15} aria-hidden />} {archived ? "Ripristina" : "Archivia"}
           </button>
         )}
-        {(archived || status === "ANNULLATO") && (
+        {isAdmin && (archived || status === "ANNULLATO") && (
           <button
             type="button"
             className="btn btn-bordeaux btn-sm"

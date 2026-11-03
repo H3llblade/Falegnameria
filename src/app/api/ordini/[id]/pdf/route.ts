@@ -1,6 +1,6 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from "pdf-lib";
 import { prisma } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth/session";
+import { canRead } from "@/lib/auth/session";
 import { formatCents, paymentState, PAYMENT_STATE_LABEL } from "@/lib/money";
 import { formatDate, formatDateShort, ORDER_STATUS_LABEL, orderNumber } from "@/lib/labels";
 
@@ -34,7 +34,7 @@ function wrap(text: string, font: PDFFont, size: number, width: number): string[
 }
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!(await getCurrentUser())) return new Response("Non autenticato", { status: 401 });
+  if (!(await canRead("ordini"))) return new Response("Non autenticato", { status: 401 });
   const { id } = await params;
   const o = await prisma.order.findUnique({
     where: { id },

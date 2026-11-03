@@ -31,7 +31,7 @@ export async function archiveAnnouncementAction(id: string, archived: boolean): 
 
 export async function deleteAnnouncementAction(id: string): Promise<ActionResult> {
   return runAction(async () => {
-    const me = await requireUser();
+    const me = await requireUser("ADMIN");
     await svc.deleteAnnouncement(prisma, idSchema.parse(id), me.id);
     refresh();
   }, "Strillone eliminato");

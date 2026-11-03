@@ -1,7 +1,9 @@
 import Link from "next/link";
 import Form from "next/form";
 import { ClipboardPlus, Megaphone, UserPlus } from "lucide-react";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { getCurrentUser, getPublicSectionsCached } from "@/lib/auth/session";
 import { formatCents, paymentState } from "@/lib/money";
 import { ANNOUNCEMENT_CATEGORY_LABEL, formatDate, formatDateShort, orderNumber } from "@/lib/labels";
 import { getSummary, PERIOD_LABEL, type Period } from "@/lib/services/dashboard";
@@ -13,6 +15,11 @@ const PERIODS: Period[] = ["oggi", "7g", "mese", "totale", "custom"];
 
 export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const sp = await searchParams;
+  const user = await getCurrentUser();
+  if (!user) {
+    const pub = await getPublicSectionsCached();
+    if (!pub.includes("registro")) redirect(pub.length ? `/${pub[0]}` : "/login");
+  }
   const period: Period = PERIODS.includes(sp.periodo as Period) ? (sp.periodo as Period) : "mese";
   const summary = await getSummary(prisma, period, sp.dal, sp.al);
   const now = new Date();
@@ -35,15 +42,19 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   return (
     <div className="space-y-8">
       <PageHeader title="Registro generale" kicker={`Situazione al ${formatDate(now)}`}>
-        <Link href="/ordini/nuovo" className="btn btn-brass">
-          <ClipboardPlus size={18} aria-hidden /> Nuovo ordine
-        </Link>
-        <Link href="/rubrica/nuovo" className="btn btn-paper">
-          <UserPlus size={18} aria-hidden /> Nuovo contatto
-        </Link>
-        <Link href="/strilloni/nuovo" className="btn btn-paper">
-          <Megaphone size={18} aria-hidden /> Nuovo strillone
-        </Link>
+        {user && (
+          <>
+            <Link href="/ordini/nuovo" className="btn btn-brass">
+              <ClipboardPlus size={18} aria-hidden /> Nuovo ordine
+            </Link>
+            <Link href="/rubrica/nuovo" className="btn btn-paper">
+              <UserPlus size={18} aria-hidden /> Nuovo contatto
+            </Link>
+            <Link href="/strilloni/nuovo" className="btn btn-paper">
+              <Megaphone size={18} aria-hidden /> Nuovo strillone
+            </Link>
+          </>
+        )}
       </PageHeader>
 
       {/* Indicatori economici: piccoli registri contabili */}
