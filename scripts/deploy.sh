@@ -120,7 +120,7 @@ pm2 save >/dev/null
 # ---------------------------------------------------------------- health check
 log "health check su http://127.0.0.1:${PORT}/api/health"
 for i in $(seq 1 30); do
-  if curl -fsS "http://127.0.0.1:${PORT}/api/health" | grep -q '"status":"ok"'; then
+  if curl -fs "http://127.0.0.1:${PORT}/api/health" 2>/dev/null | grep -q '"status":"ok"'; then
     echo "$(date -Is) ok ${TARGET} (da ${PREV})" >> .deploy/history.log
     log "DEPLOY COMPLETATO: ${TARGET:0:10}"
     exit 0
