@@ -39,7 +39,9 @@ source ./.env
 set +a
 PM2_NAME="${PM2_NAME:-falegnameria}"
 PORT="${PORT:-3100}"
-export NODE_ENV=production
+# NODE_ENV=production lo imposta PM2 per il processo in esecuzione (ecosystem.config.cjs):
+# qui non va esportato, altrimenti npm ci salterebbe le dipendenze necessarie alla build.
+unset NODE_ENV
 
 # ---------------------------------------------------------------- git
 if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
@@ -60,7 +62,7 @@ rollback() {
     rm -rf .next-failed && mv .next .next-failed 2>/dev/null || true
     mv .next-prev .next
   fi
-  npm ci --no-audit --no-fund >/dev/null 2>&1 || true
+  npm ci --include=dev --no-audit --no-fund >/dev/null 2>&1 || true
   pm2 reload "$PM2_NAME" --update-env >/dev/null 2>&1 || true
   echo "$(date -Is) rollback ${PREV} (fallito ${TARGET})" >> .deploy/history.log
 }
@@ -80,7 +82,7 @@ fi
 # ---------------------------------------------------------------- checkout + dipendenze
 git checkout --quiet --detach "$TARGET"
 log "installazione dipendenze (npm ci)"
-if ! npm ci --no-audit --no-fund; then
+if ! npm ci --include=dev --no-audit --no-fund; then
   git checkout --quiet --detach "$PREV"; die "npm ci fallito: codice ripristinato"
 fi
 
@@ -99,7 +101,7 @@ rm -rf .next-build
 if ! NEXT_DIST_DIR=.next-build APP_VERSION="${TARGET:0:10}" npm run build; then
   rm -rf .next-build
   git checkout --quiet --detach "$PREV"
-  npm ci --no-audit --no-fund >/dev/null 2>&1 || true
+  npm ci --include=dev --no-audit --no-fund >/dev/null 2>&1 || true
   die "build fallita: il sito continua con la versione precedente"
 fi
 rm -rf .next-prev
