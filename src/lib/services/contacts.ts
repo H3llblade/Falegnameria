@@ -87,8 +87,8 @@ export function splitImportName(fullName: string): { firstName: string; lastName
 }
 
 /**
- * Importa i contatti. Un doppione (stesso codice missiva oppure stesso nome e cognome,
- * in rubrica o in una riga precedente dello stesso lotto) viene accorpato al contatto
+ * Importa i contatti. Un doppione (stesso codice missiva, in rubrica o in una riga
+ * precedente dello stesso lotto) viene accorpato al contatto
  * esistente: nome, cognome, codice e attività vengono aggiornati, città e note restano.
  */
 export async function importContacts(db: PrismaClient, raw: unknown, userId: string, source: string) {
@@ -99,7 +99,7 @@ export async function importContacts(db: PrismaClient, raw: unknown, userId: str
     const merged = new Set<string>();
     for (const r of rows) {
       const data = { ...splitImportName(r.fullName), missiveCode: r.missiveCode, activity: r.activity };
-      const dup = findDuplicates(data, existing)[0];
+      const dup = findDuplicates(data, existing).find((d) => d.reason === "codice");
       if (dup) {
         const before = await tx.contact.findUnique({ where: { id: dup.id } });
         await tx.contact.update({ where: { id: dup.id }, data });

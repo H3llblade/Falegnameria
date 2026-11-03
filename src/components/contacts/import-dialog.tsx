@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, ClipboardPaste, FileUp, ImageUp, Plus, ScanText, Trash2 } from "lucide-react";
 import { checkDuplicatesAction, importContactsAction } from "@/app/actions/contacts";
 import { contactImportRowSchema } from "@/lib/validation/schemas";
-import { normalizeCode, normalizeName, parseCsv, type DupMatch } from "@/lib/contacts";
+import { normalizeCode, parseCsv, type DupMatch } from "@/lib/contacts";
 import { LOW_CONFIDENCE, linesFromPlainText, parseContactsFromOcr, type ParsedContact } from "@/lib/ocr/parser";
 import { Modal } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/bits";
@@ -100,16 +100,14 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
     setChecking(false);
     if (!r.ok) return list;
     // Doppioni anche all'interno dello stesso lotto (verranno accorpati alla riga precedente)
+    // Si accorpa solo con lo stesso codice missiva
     const seenCode = new Map<string, number>();
-    const seenName = new Map<string, number>();
     return list.map((x, i) => {
-      const dups = [...(r.data?.[i] ?? [])];
+      const dups = (r.data?.[i] ?? []).filter((d) => d.reason === "codice");
       const code = normalizeCode(x.missiveCode);
-      const name = normalizeName(x.fullName);
-      const prev = (code ? seenCode.get(code) : undefined) ?? (name.length > 1 ? seenName.get(name) : undefined);
-      if (dups.length === 0 && prev !== undefined) dups.push({ id: "", reason: seenCode.get(code) === prev ? "codice" : "nome", label: `riga ${prev + 1} di questa importazione` });
+      const prev = code ? seenCode.get(code) : undefined;
+      if (dups.length === 0 && prev !== undefined) dups.push({ id: "", reason: "codice", label: `riga ${prev + 1} di questa importazione` });
       if (code && !seenCode.has(code)) seenCode.set(code, i);
-      if (name.length > 1 && !seenName.has(name)) seenName.set(name, i);
       return { ...x, dups };
     });
   }, []);
@@ -267,8 +265,8 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
           <div className="min-w-0 flex-1 space-y-1">
             <p className="font-heading">Verificate e correggete i dati prima di salvarli.</p>
             <p className="font-fell italic text-ink-soft">
-              I campi evidenziati hanno una lettura incerta. Nulla viene salvato finché non confermate. I doppioni (stesso codice missiva o
-              stesso nome e cognome) vengono accorpati al contatto già presente, aggiornandone i dati.
+              I campi evidenziati hanno una lettura incerta. Nulla viene salvato finché non confermate. I contatti con lo stesso codice missiva
+              di uno già presente vengono accorpati a quello, aggiornandone i dati.
             </p>
             {error && (
               <p className="font-fell italic text-bordeaux" role="alert">
@@ -339,7 +337,7 @@ function ImportFlow({ onDone }: { onDone: () => void }) {
                   <tr key={`d${r.key}`} className="!bg-transparent">
                     <td />
                     <td colSpan={4} className="!pt-0 font-fell text-sm italic text-sepia">
-                      {r.fullName || r.missiveCode}: verrà accorpato a {r.dups[0].label} (stesso {r.dups[0].reason})
+                      {r.fullName || r.missiveCode}: verrà accorpato a {r.dups[0].label} (stesso codice)
                     </td>
                   </tr>
                 ) : null,

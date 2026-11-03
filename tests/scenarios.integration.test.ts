@@ -186,14 +186,15 @@ d("scenari del gestionale", () => {
           { fullName: "Arthur Morgan", missiveCode: "004 51", activity: "Pistolero" }, // stesso codice → accorpato
           { fullName: "John Marston", missiveCode: "CH 856", activity: "Allevatore" },
           { fullName: "Jack Marston", missiveCode: "CH856", activity: "Scrittore" }, // doppione nel lotto
+          { fullName: "Arthur Morgan", missiveCode: "999", activity: "Omonimo" }, // stesso nome, codice diverso → nuovo
         ],
       },
       userId,
       "csv",
     );
-    expect(r).toEqual({ created: 1, merged: 2 });
+    expect(r).toEqual({ created: 2, merged: 2 });
     const all = await db.contact.findMany({ orderBy: { createdAt: "asc" } });
-    expect(all).toHaveLength(2);
+    expect(all).toHaveLength(3);
     expect(all[0]).toMatchObject({ id: c.id, firstName: "Arthur", lastName: "Morgan", missiveCode: "00451", activity: "Pistolero", city: "Valentine" });
     expect(all[1]).toMatchObject({ firstName: "Jack", lastName: "Marston", missiveCode: "CH856", activity: "Scrittore" });
   });
