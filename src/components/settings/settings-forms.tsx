@@ -2,9 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
+import { useFieldArray, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, Copy, Eye, KeyRound, LogOut, Pencil, Plus, Trash2, UserPlus, X } from "lucide-react";
+import { Check, Coins, Copy, Eye, KeyRound, LogOut, Pencil, Plus, Trash2, UserPlus, X } from "lucide-react";
 import {
   changePasswordAction,
   createUserAction,
@@ -14,8 +14,9 @@ import {
   setUserActiveAction,
   updateUserAction,
 } from "@/app/actions/auth";
+import { setPurchaseProductsAction } from "@/app/actions/settings";
 import { createCategoryAction, deleteCategoryAction, renameCategoryAction } from "@/app/actions/recipes";
-import { passwordChangeSchema, userCreateSchema } from "@/lib/validation/schemas";
+import { passwordChangeSchema, userCreateSchema, purchaseProductsSchema, type PurchaseProductsInput } from "@/lib/validation/schemas";
 import { formatDateTime } from "@/lib/labels";
 import { applyServerErrors, FieldShell, Input, Select } from "@/components/ui/form";
 import { Modal, useConfirm } from "@/components/ui/dialog";
@@ -150,6 +151,64 @@ export function CategoriesManager({ categories, isAdmin }: { categories: { id: s
         </button>
       </form>
     </div>
+  );
+}
+
+export function PurchaseProductsForm({ initial }: { initial: PurchaseProductsInput["products"] }) {
+  const router = useRouter();
+  const toast = useActionToast();
+  const form = useForm<PurchaseProductsInput>({ resolver: zodResolver(purchaseProductsSchema), defaultValues: { products: initial } });
+  const { fields, append, remove } = useFieldArray({ control: form.control, name: "products" });
+  const e = form.formState.errors.products;
+  return (
+    <form
+      noValidate
+      className="mt-3"
+      onSubmit={form.handleSubmit(async (v) => {
+        const r = await setPurchaseProductsAction(v);
+        toast(r);
+        if (r.ok) router.refresh();
+        else applyServerErrors(r.fieldErrors, form.setError);
+      })}
+    >
+      <p className="font-fell italic text-ink-soft">
+        Ciò che la bottega compra da terzi e quanto paga per ogni unità. L&apos;elenco compare nel Registro generale e nel calcolatore
+        «Acquisti».
+      </p>
+      <ul className="mt-3 space-y-2">
+        <li className="hidden grid-cols-[1fr_7rem_8rem_auto] gap-2 sm:grid" aria-hidden>
+          <span className="field-label !mb-0">Prodotto</span>
+          <span className="field-label !mb-0">Unità</span>
+          <span className="field-label !mb-0">Prezzo ($)</span>
+          <span className="w-9" />
+        </li>
+        {fields.map((f, i) => (
+          <li key={f.id} className="grid grid-cols-[1fr_7rem_8rem_auto] items-start gap-2 max-sm:grid-cols-[1fr_1fr_auto]">
+            <div className="max-sm:col-span-3">
+              <Input aria-label={`Prodotto ${i + 1}`} placeholder="Es. Legno pregiato" invalid={!!e?.[i]?.name} {...form.register(`products.${i}.name`)} />
+              {e?.[i]?.name && <p className="font-fell text-sm italic text-bordeaux">{e[i]!.name!.message}</p>}
+            </div>
+            <Input aria-label={`Unità ${i + 1}`} placeholder="pz, kg…" {...form.register(`products.${i}.unit`)} />
+            <div>
+              <Input aria-label={`Prezzo ${i + 1}`} inputMode="decimal" className="num" placeholder="0,00" invalid={!!e?.[i]?.price} {...form.register(`products.${i}.price`)} />
+              {e?.[i]?.price && <p className="font-fell text-sm italic text-bordeaux">{e[i]!.price!.message}</p>}
+            </div>
+            <button type="button" className="btn btn-ghost btn-sm text-bordeaux" onClick={() => remove(i)} aria-label={`Rimuovi prodotto ${i + 1}`}>
+              <Trash2 size={16} aria-hidden />
+            </button>
+          </li>
+        ))}
+      </ul>
+      {fields.length === 0 && <p className="mt-2 font-fell italic text-ink-soft">Nessun prodotto: l&apos;elenco non verrà mostrato.</p>}
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="button" className="btn btn-paper btn-sm" onClick={() => append({ id: "", name: "", unit: "pz", price: "" })}>
+          <Plus size={15} aria-hidden /> Aggiungi prodotto
+        </button>
+        <button className="btn btn-ink btn-sm" disabled={form.formState.isSubmitting}>
+          <Coins size={15} aria-hidden /> Salva prodotti
+        </button>
+      </div>
+    </form>
   );
 }
 

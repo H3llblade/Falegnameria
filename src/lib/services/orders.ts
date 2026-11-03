@@ -13,9 +13,9 @@ import {
   parseDateInput,
 } from "@/lib/validation/schemas";
 import { DomainError } from "./errors";
+import type { MaterialsSnapshot } from "@/lib/quantity";
 
 type OrderData = z.output<typeof orderSchema>;
-type MaterialSnapshot = { name: string; quantity: string; unit: string }[];
 
 /** Blocca la riga dell'ordine per serializzare pagamenti/modifiche concorrenti */
 async function lockOrder(tx: Tx, orderId: string) {
@@ -39,10 +39,13 @@ export async function recalcOrder(tx: Tx, orderId: string) {
   return tx.order.update({ where: { id: orderId }, data: { totalCents, paidCents } });
 }
 
-async function materialsSnapshot(tx: Tx, recipeId: string): Promise<MaterialSnapshot | null> {
+async function materialsSnapshot(tx: Tx, recipeId: string): Promise<MaterialsSnapshot | null> {
   const recipe = await tx.recipe.findUnique({ where: { id: recipeId }, include: { materials: { orderBy: { sortOrder: "asc" } } } });
   if (!recipe) return null;
-  return recipe.materials.map((m) => ({ name: m.name, quantity: m.quantity.toString(), unit: m.unit }));
+  return {
+    yield: recipe.yieldQuantity,
+    materials: recipe.materials.map((m) => ({ name: m.name, quantity: m.quantity.toString(), unit: m.unit })),
+  };
 }
 
 function lineValues(item: OrderData["items"][number]) {

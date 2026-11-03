@@ -121,6 +121,8 @@ model Recipe {
   tools                String    @default("")
   procedure            String    @default("")
   timeMinutes          Int?
+  /// Unità prodotte con una esecuzione della ricetta (i materiali si riferiscono a questa resa)
+  yieldQuantity        Int       @default(1)
   materialCostCents    Int?
   suggestedPriceCents  Int?
   notes                String?
@@ -194,7 +196,8 @@ model OrderItem {
   quantity       Int
   unitPriceCents Int
   lineTotalCents Int
-  /// Copia dei materiali della ricetta al momento dell'ordine (per unità)
+  /// Copia della ricetta al momento dell'ordine: { yield, materials } (materiali per una esecuzione).
+  /// Gli ordini precedenti alla resa contengono il solo array dei materiali (resa 1).
   materialsSnapshot Json?
   sortOrder      Int     @default(0)
 

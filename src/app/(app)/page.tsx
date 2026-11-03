@@ -7,6 +7,7 @@ import { getCurrentUser, getPublicSectionsCached } from "@/lib/auth/session";
 import { formatCents, paymentState } from "@/lib/money";
 import { ANNOUNCEMENT_CATEGORY_LABEL, formatDate, formatDateShort, orderNumber } from "@/lib/labels";
 import { getSummary, PERIOD_LABEL, type Period } from "@/lib/services/dashboard";
+import { getPurchaseProducts } from "@/lib/services/settings";
 import { Flourish, PageHeader, PaymentLabel, StatusLabel, tiltFor } from "@/components/ui/bits";
 
 export const metadata = { title: "Registro generale" };
@@ -23,7 +24,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
   const period: Period = PERIODS.includes(sp.periodo as Period) ? (sp.periodo as Period) : "mese";
   const summary = await getSummary(prisma, period, sp.dal, sp.al);
   const now = new Date();
-  const [latest, waiting, ready, payments, announcements] = await Promise.all([
+  const [latest, waiting, ready, payments, announcements, purchases] = await Promise.all([
     prisma.order.findMany({ where: { archivedAt: null }, orderBy: { createdAt: "desc" }, take: 6 }),
     prisma.order.findMany({ where: { status: { in: ["RICEVUTO", "IN_ATTESA"] } }, orderBy: [{ dueDate: "asc" }, { createdAt: "asc" }], take: 6 }),
     prisma.order.findMany({ where: { status: "PRONTO" }, orderBy: { dueDate: "asc" }, take: 6 }),
@@ -33,6 +34,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
       orderBy: [{ pinned: "desc" }, { publishedAt: "desc" }],
       take: 3,
     }),
+    getPurchaseProducts(prisma),
   ]);
   const periodText =
     period === "custom"
@@ -189,6 +191,22 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
             </ul>
           )}
         </Panel>
+        {purchases.length > 0 && (
+          <Panel title="La bottega acquista" href={user ? "/acquisti" : undefined} className="lg:col-span-3">
+            <p className="mb-2 font-fell italic text-ink-soft">Prezzi pagati per ogni unità consegnata alla bottega.</p>
+            <ul className="grid gap-x-8 sm:grid-cols-2 lg:grid-cols-3">
+              {purchases.map((p) => (
+                <li key={p.id} className="flex items-baseline justify-between gap-3 border-b border-ink/15 py-1.5">
+                  <span>{p.name}</span>
+                  <span className="num whitespace-nowrap">
+                    {p.priceCents > 0 ? formatCents(p.priceCents) : <span className="font-fell italic text-ink-soft">da stabilire</span>}
+                    {p.priceCents > 0 && <span className="text-sm text-ink-soft"> / {p.unit || "unità"}</span>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+        )}
       </div>
     </div>
   );

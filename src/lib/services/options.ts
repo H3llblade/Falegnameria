@@ -21,6 +21,7 @@ export async function orderFormOptions(db: PrismaClient): Promise<{ contacts: Co
       name: r.name,
       category: r.category?.name ?? null,
       suggestedPriceCents: r.suggestedPriceCents,
+      yieldQuantity: r.yieldQuantity,
       materials: r.materials.map((m) => ({ name: m.name, quantity: m.quantity.toString(), unit: m.unit })),
     })),
   };

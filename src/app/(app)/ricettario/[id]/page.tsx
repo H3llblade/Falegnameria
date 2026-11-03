@@ -21,7 +21,7 @@ export default async function RecipeDetail({ params }: { params: Promise<{ id: s
   const r = await prisma.recipe.findUnique({
     where: { id },
     select: {
-      id: true, name: true, description: true, tools: true, procedure: true, timeMinutes: true, notes: true,
+      id: true, name: true, description: true, tools: true, procedure: true, timeMinutes: true, yieldQuantity: true, notes: true,
       materialCostCents: true, suggestedPriceCents: true, imageMime: true, isDemo: true, archivedAt: true,
       category: true,
       materials: { orderBy: { sortOrder: "asc" } },
@@ -69,6 +69,10 @@ export default async function RecipeDetail({ params }: { params: Promise<{ id: s
               <dd className="num">{r.timeMinutes ? `${r.timeMinutes} min` : "—"}</dd>
             </div>
             <div>
+              <dt className="field-label">Resa della ricetta</dt>
+              <dd className="num">{r.yieldQuantity} unità per esecuzione</dd>
+            </div>
+            <div>
               <dt className="field-label">Costo materiali</dt>
               <dd className="num">{r.materialCostCents != null ? formatCents(r.materialCostCents) : "—"}</dd>
             </div>
@@ -96,7 +100,7 @@ export default async function RecipeDetail({ params }: { params: Promise<{ id: s
         {/* Pagina destra */}
         <section className="px-6 py-8 sm:px-10">
           <h2 className="font-display text-xl">Materiali</h2>
-          <MaterialsCalculator materials={r.materials.map((m) => ({ name: m.name, quantity: m.quantity.toString(), unit: m.unit }))} />
+          <MaterialsCalculator yieldQuantity={r.yieldQuantity} materials={r.materials.map((m) => ({ name: m.name, quantity: m.quantity.toString(), unit: m.unit }))} />
           {steps.length > 0 && (
             <>
               <h2 className="mt-7 font-display text-xl">Procedimento</h2>

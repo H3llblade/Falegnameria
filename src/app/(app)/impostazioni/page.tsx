@@ -2,8 +2,9 @@ import { prisma } from "@/lib/db";
 import { requirePageUser } from "@/lib/auth/session";
 import { formatDateTime } from "@/lib/labels";
 import { PageHeader } from "@/components/ui/bits";
-import { CategoriesManager, PasswordForm, PublicSectionsForm, SessionsBox, UsersManager } from "@/components/settings/settings-forms";
-import { getPublicSections, SECTION_LABEL, SECTIONS } from "@/lib/services/settings";
+import { CategoriesManager, PasswordForm, PublicSectionsForm, SessionsBox, UsersManager, PurchaseProductsForm } from "@/components/settings/settings-forms";
+import { getPublicSections, getPurchaseProducts, SECTION_LABEL, SECTIONS } from "@/lib/services/settings";
+import { centsToInput } from "@/lib/money";
 
 export const metadata = { title: "Impostazioni" };
 
@@ -93,6 +94,15 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <h2 className="font-display text-xl">Categorie del ricettario</h2>
         <CategoriesManager isAdmin={me.role === "ADMIN"} categories={categories.map((c) => ({ id: c.id, name: c.name, count: c._count.recipes }))} />
       </section>
+
+      {me.role === "ADMIN" && (
+        <section id="acquisti" className="paper scroll-mt-6 px-6 py-6">
+          <h2 className="font-display text-xl">Prodotti che acquistiamo</h2>
+          <PurchaseProductsForm
+            initial={(await getPurchaseProducts(prisma)).map((p) => ({ id: p.id, name: p.name, unit: p.unit, price: centsToInput(p.priceCents) }))}
+          />
+        </section>
+      )}
 
       {me.role === "ADMIN" && (
         <section className="paper px-6 py-6">

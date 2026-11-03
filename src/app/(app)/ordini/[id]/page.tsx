@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { viewerFor } from "@/lib/auth/session";
 import { formatCents, paymentState } from "@/lib/money";
 import { formatDate, formatDateShort, formatDateTime, orderNumber } from "@/lib/labels";
-import { scaleMaterials, sumMaterials, type ScaledMaterial } from "@/lib/quantity";
+import { planRecipe, readSnapshot, sumMaterials, type ScaledMaterial } from "@/lib/quantity";
 import { Flourish, PaymentLabel, Stamp, StatusLabel, StatusStamp } from "@/components/ui/bits";
 import { OrderActions } from "@/components/orders/order-actions";
 import { PaymentsPanel } from "@/components/orders/payments-panel";
@@ -15,7 +15,6 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return { title: o ? orderNumber(o.number) : "Ordine" };
 }
 
-type Snapshot = { name: string; quantity: string; unit: string }[];
 
 export default async function OrderDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -39,10 +38,10 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
   const residual = order.totalCents - order.paidCents;
   const ps = paymentState(order.totalCents, order.paidCents);
   const materialLists: ScaledMaterial[][] = order.items.flatMap((it) => {
-    const snap = it.materialsSnapshot as Snapshot | null;
-    if (!snap || !Array.isArray(snap) || snap.length === 0) return [];
+    const snap = readSnapshot(it.materialsSnapshot);
+    if (!snap || snap.materials.length === 0) return [];
     try {
-      return [scaleMaterials(snap, it.quantity)];
+      return [planRecipe(snap.materials, snap.yield, it.quantity).materials];
     } catch {
       return [];
     }
@@ -165,7 +164,7 @@ export default async function OrderDetail({ params }: { params: Promise<{ id: st
         {materials.length > 0 && (
           <>
             <h2 className="mt-7 font-display text-xl">Materiali necessari</h2>
-            <p className="font-fell text-sm italic text-ink-soft">Calcolati sulle quantità ordinate, secondo il ricettario al momento dell&apos;ordine.</p>
+            <p className="font-fell text-sm italic text-ink-soft">Calcolati sulle quantità ordinate (arrotondate a ricette intere, secondo la resa), secondo il ricettario al momento dell&apos;ordine.</p>
             <ul className="mt-2 grid gap-x-6 sm:grid-cols-2">
               {materials.map((m) => (
                 <li key={m.name + m.unit} className="flex justify-between gap-3 border-b border-ink/15 py-1">

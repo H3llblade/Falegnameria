@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { BookOpen, ClipboardList, Contact, KeyRound, LogOut, Megaphone, Menu, NotebookPen, Plus, Settings, X } from "lucide-react";
+import { Axe, BookOpen, ClipboardList, Contact, KeyRound, LogOut, Megaphone, Menu, NotebookPen, Plus, Settings, X } from "lucide-react";
 import { logoutAction } from "@/app/actions/auth";
 
 export type NavUser = { name: string; role: "ADMIN" | "STAFF" } | null;
@@ -16,6 +16,7 @@ export const NAV = [
   { href: "/strilloni", label: "Strilloni", short: "Strilloni", icon: Megaphone, section: "strilloni" },
   { href: "/ricettario", label: "Ricettario", short: "Ricettario", icon: BookOpen, section: "ricettario" },
   { href: "/rubrica", label: "Rubrica contatti", short: "Rubrica", icon: Contact, section: "rubrica" },
+  { href: "/acquisti", label: "Acquisti (calcolo compenso)", short: "Acquisti", icon: Axe, section: null },
   { href: "/impostazioni", label: "Impostazioni", short: "Impostazioni", icon: Settings, section: null },
 ];
 

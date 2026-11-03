@@ -10,7 +10,7 @@ import { createRecipe, updateRecipe } from "@/lib/services/recipes";
 import { createAnnouncement, updateAnnouncement } from "@/lib/services/announcements";
 import { getSummary } from "@/lib/services/dashboard";
 import { paymentState } from "@/lib/money";
-import { scaleMaterials } from "@/lib/quantity";
+import { planRecipe, readSnapshot } from "@/lib/quantity";
 
 const url = process.env.TEST_DATABASE_URL;
 const d = url ? describe : describe.skip;
@@ -111,14 +111,31 @@ d("scenari del gestionale", () => {
     );
     const o = await createOrder(db, { contactMode: "none", customerName: "Dutch", title: "Tavoli", status: "RICEVUTO", items: [{ recipeId: r.id, description: "Tavolo", quantity: "5", unitPrice: "35" }] }, userId);
     const item = await db.orderItem.findFirstOrThrow({ where: { orderId: o.id } });
-    const mats = scaleMaterials(item.materialsSnapshot as { name: string; quantity: string; unit: string }[], item.quantity);
+    const snap = readSnapshot(item.materialsSnapshot)!;
+    const mats = planRecipe(snap.materials, snap.yield, item.quantity).materials;
     expect(mats.find((m) => m.name === "Assi di legno")!.total).toBe("20");
     expect(mats.find((m) => m.name === "Chiodi")!.total).toBe("60");
     // modifica della ricetta: vale per il futuro, l'ordine storico non cambia
     await updateRecipe(db, r.id, { name: "Tavolo", suggestedPrice: "50", materials: [{ name: "Assi di legno", quantity: "6", unit: "pz" }] }, { kind: "keep" }, userId);
     const again = await db.orderItem.findFirstOrThrow({ where: { orderId: o.id } });
     expect(again.unitPriceCents).toBe(3500);
-    expect((again.materialsSnapshot as { quantity: string }[])[0].quantity).toBe("4");
+    expect(readSnapshot(again.materialsSnapshot)!.materials[0].quantity).toBe("4");
+  });
+
+  it("Scenario 3b — ricetta base con resa: 2 assi producono 8 pezzi", async () => {
+    const r = await createRecipe(
+      db,
+      { name: "Manici", yieldQuantity: "8", materials: [{ name: "Assi di pino", quantity: "2", unit: "pz" }] },
+      { kind: "keep" },
+      userId,
+    );
+    expect(r.yieldQuantity).toBe(8);
+    const o = await createOrder(db, { contactMode: "none", customerName: "Arthur", title: "Manici", status: "RICEVUTO", items: [{ recipeId: r.id, description: "Manico", quantity: "20", unitPrice: "2" }] }, userId);
+    const item = await db.orderItem.findFirstOrThrow({ where: { orderId: o.id } });
+    const snap = readSnapshot(item.materialsSnapshot)!;
+    expect(snap.yield).toBe(8);
+    // 20 pezzi → 3 esecuzioni → 6 assi
+    expect(planRecipe(snap.materials, snap.yield, item.quantity).materials[0].total).toBe("6");
   });
 
   it("Scenario 4 — strillone con emoji salvato e modificato senza perdite", async () => {

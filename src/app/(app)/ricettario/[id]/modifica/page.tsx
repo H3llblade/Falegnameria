@@ -14,7 +14,7 @@ export default async function EditRecipePage({ params }: { params: Promise<{ id:
     prisma.recipe.findUnique({
       where: { id },
       select: {
-        id: true, name: true, categoryId: true, description: true, tools: true, procedure: true, timeMinutes: true,
+        id: true, name: true, categoryId: true, description: true, tools: true, procedure: true, timeMinutes: true, yieldQuantity: true,
         materialCostCents: true, suggestedPriceCents: true, notes: true, imageMime: true,
         materials: { orderBy: { sortOrder: "asc" } },
       },
@@ -37,6 +37,7 @@ export default async function EditRecipePage({ params }: { params: Promise<{ id:
           tools: r.tools,
           procedure: r.procedure,
           timeMinutes: r.timeMinutes ? String(r.timeMinutes) : "",
+          yieldQuantity: String(r.yieldQuantity),
           materialCost: r.materialCostCents != null ? centsToInput(r.materialCostCents) : "",
           suggestedPrice: r.suggestedPriceCents != null ? centsToInput(r.suggestedPriceCents) : "",
           notes: r.notes ?? "",

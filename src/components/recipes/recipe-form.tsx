@@ -41,6 +41,7 @@ export function RecipeForm({
       tools: "",
       procedure: "",
       timeMinutes: "",
+      yieldQuantity: "1",
       materialCost: "",
       suggestedPrice: "",
       notes: "",
@@ -98,10 +99,10 @@ export function RecipeForm({
         <FieldShell label="Tempo di lavorazione (minuti)" htmlFor="r-time" error={errors.timeMinutes}>
           <Input id="r-time" inputMode="numeric" className="num" {...register("timeMinutes")} />
         </FieldShell>
-        <FieldShell label="Costo dei materiali ($)" htmlFor="r-cost" error={errors.materialCost}>
+        <FieldShell label="Costo dei materiali ($)" htmlFor="r-cost" error={errors.materialCost} hint="Per una unità di prodotto">
           <Input id="r-cost" inputMode="decimal" className="num" placeholder="0,00" invalid={!!errors.materialCost} {...register("materialCost")} />
         </FieldShell>
-        <FieldShell label="Prezzo di vendita suggerito ($)" htmlFor="r-price" error={errors.suggestedPrice}>
+        <FieldShell label="Prezzo di vendita suggerito ($)" htmlFor="r-price" error={errors.suggestedPrice} hint="Per una unità di prodotto">
           <Input id="r-price" inputMode="decimal" className="num" placeholder="0,00" invalid={!!errors.suggestedPrice} {...register("suggestedPrice")} />
         </FieldShell>
         <FieldShell label="Descrizione" htmlFor="r-desc" className="sm:col-span-2">
@@ -110,7 +111,14 @@ export function RecipeForm({
       </div>
 
       <fieldset className="pl-8">
-        <legend className="font-display text-xl">Materiali necessari (per una unità)</legend>
+        <legend className="font-display text-xl">Ricetta base</legend>
+        <p className="font-fell italic text-ink-soft">
+          Indicate i materiali di una singola esecuzione e quante unità di prodotto se ne ottengono (es. 2 assi di pino → 8 manici).
+        </p>
+        <FieldShell label="Unità prodotte con questa ricetta" htmlFor="r-yield" required error={errors.yieldQuantity} className="mt-3 max-w-xs">
+          <Input id="r-yield" inputMode="numeric" className="num" invalid={!!errors.yieldQuantity} {...register("yieldQuantity")} />
+        </FieldShell>
+        <h3 className="mt-4 font-heading text-lg">Materiali necessari per una esecuzione</h3>
         <ul className="mt-2 space-y-2">
           {fields.map((f, i) => {
             const e = errors.materials?.[i];

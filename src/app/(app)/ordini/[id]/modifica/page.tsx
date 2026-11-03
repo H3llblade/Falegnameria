@@ -25,6 +25,7 @@ export default async function EditOrderPage({ params }: { params: Promise<{ id: 
         name: `${r.name} (archiviata)`,
         category: r.category?.name ?? null,
         suggestedPriceCents: r.suggestedPriceCents,
+        yieldQuantity: r.yieldQuantity,
         materials: r.materials.map((m) => ({ name: m.name, quantity: m.quantity.toString(), unit: m.unit })),
       })),
     );

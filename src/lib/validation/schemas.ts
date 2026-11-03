@@ -134,12 +134,36 @@ export const recipeSchema = z.object({
     .refine((v) => v === "" || (/^\d{1,5}$/.test(v) && Number(v) > 0), "Tempo: minuti interi")
     .optional()
     .default(""),
+  yieldQuantity: z
+    .string()
+    .trim()
+    .refine((v) => /^\d{1,5}$/.test(v) && Number(v) > 0, "Resa: numero intero di unità maggiore di zero")
+    .default("1"),
   materialCost: moneyString("Costo materiali", { optional: true }).optional().default(""),
   suggestedPrice: moneyString("Prezzo suggerito", { optional: true }).optional().default(""),
   notes: trimmed(5000).optional().default(""),
   materials: z.array(recipeMaterialSchema).max(80).default([]),
 });
 export type RecipeInput = z.input<typeof recipeSchema>;
+
+export const purchaseProductSchema = z.object({
+  id: z.string().max(40).optional().default(""),
+  name: required("Prodotto", 80),
+  unit: trimmed(20).optional().default(""),
+  price: moneyString("Prezzo d'acquisto"),
+});
+
+export const purchaseProductsSchema = z
+  .object({ products: z.array(purchaseProductSchema).max(50, "Massimo 50 prodotti") })
+  .superRefine((v, ctx) => {
+    const seen = new Set<string>();
+    v.products.forEach((p, i) => {
+      const k = p.name.trim().toLowerCase();
+      if (seen.has(k)) ctx.addIssue({ code: "custom", path: ["products", i, "name"], message: "Prodotto già presente" });
+      seen.add(k);
+    });
+  });
+export type PurchaseProductsInput = z.input<typeof purchaseProductsSchema>;
 
 export const categorySchema = z.object({ name: required("Nome categoria", 60) });
 

@@ -9,7 +9,7 @@ import { createOrderAction, updateOrderAction } from "@/app/actions/orders";
 import { orderSchema, type OrderInput } from "@/lib/validation/schemas";
 import { ORDER_STATUS_LABEL, ORDER_STATUSES } from "@/lib/labels";
 import { centsToInput, formatCents, safeParseMoney } from "@/lib/money";
-import { scaleMaterials, sumMaterials } from "@/lib/quantity";
+import { planRecipe, sumMaterials } from "@/lib/quantity";
 import { applyServerErrors, FieldShell, Input, Select, Textarea } from "@/components/ui/form";
 import { useActionToast } from "@/components/ui/toast";
 import { Flourish } from "@/components/ui/bits";
@@ -20,6 +20,7 @@ export type RecipeOption = {
   name: string;
   category: string | null;
   suggestedPriceCents: number | null;
+  yieldQuantity: number;
   materials: { name: string; quantity: string; unit: string }[];
 };
 
@@ -125,7 +126,7 @@ export function OrderForm({
       const qty = /^\d+$/.test(it?.quantity ?? "") ? Number(it!.quantity) : 0;
       if (!r || r.materials.length === 0 || qty <= 0) return [];
       try {
-        return [scaleMaterials(r.materials, qty)];
+        return [planRecipe(r.materials, r.yieldQuantity, qty).materials];
       } catch {
         return [];
       }
